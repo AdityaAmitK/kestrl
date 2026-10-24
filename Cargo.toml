@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/kestrl-core", "crates/kestrl-cli"]
+members = ["crates/kestrl-core", "crates/kestrl-cli", "crates/kestrl-ffi"]
 
 [workspace.package]
 version = "0.1.0"
@@ -23,6 +23,7 @@ ulid = "1"
 time = { version = "0.3", features = ["serde", "formatting", "parsing", "local-offset"] }
 directories = "5"
 urlencoding = "2"
+uniffi = "0.32"
 rpassword = "7"
 ctrlc = { version = "3.5", features = ["termination"] }
 regex = "1"

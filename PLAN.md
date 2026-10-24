@@ -73,6 +73,20 @@ app/              SwiftUI macOS app; links kestrl-ffi as an XCFramework
 - **Output:** human-readable on a TTY; JSON when stdout is not a TTY or with `--json`.
 - **Speed:** sync where possible, tokio only around network I/O, rustls, thin-LTO release builds, no daemon.
 
+### FFI surface
+
+`kestrl-ffi` exposes only these functions to the SwiftUI app. Each is a thin wrapper over `kestrl-core`, with no logic of its own. `scripts/build-xcframework.sh` builds `app/Frameworks/KestrlFFI.xcframework` and `app/Generated/kestrl_ffi.swift`.
+
+| Area | Functions |
+|---|---|
+| Workspace | `open_workspace(path) -> WorkspaceInfo` (root, default env, envs, profiles, request files) |
+| Requests | `send_request_file(root, path, env, profiles, vars)`, `send_ad_hoc(root, method, url, env)` → `SentExchange`; recorded as actor `me`, source `app` |
+| History | `list_events(filter)`, `show_event(id)`, `tag_event`, `untag_event`, `set_note`, `diff_events(a, b)` → JSON string |
+| Environments | `resolved_env(root, env)` → `[KeyValue]`, secrets masked |
+| Secrets | `set_secret(name, value)`, `delete_secret(name)`, `secret_status(root)` |
+
+Errors are one `KestrlError` enum: `File`, `Request`, `Secret`, `History`, `InvalidInput`, each with a `message`. Logs, database and capture functions arrive with their phases.
+
 ## Project layout
 
 ```

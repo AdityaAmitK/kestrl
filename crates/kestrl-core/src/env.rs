@@ -5,7 +5,8 @@ use std::path::Path;
 
 use serde::Deserialize;
 
-use crate::workspace;
+use crate::vars::Variables;
+use crate::workspace::{self, WorkspaceConfig};
 use crate::{Error, Result};
 
 #[derive(Debug, Default, Deserialize)]
@@ -26,5 +27,23 @@ impl Environment {
 
     pub fn names(workspace: &Path) -> Result<Vec<String>> {
         workspace::names(&workspace.join(".kestrl/envs"))
+    }
+
+    /// The variables with every reference expanded and secret values masked.
+    /// Workspace variables are the fallback for names the environment lacks.
+    pub fn resolved(workspace: &Path, name: &str) -> Result<BTreeMap<String, String>> {
+        let config = WorkspaceConfig::load(workspace)?;
+        let mut vars = Variables {
+            workspace: config.vars,
+            environment: Self::load(workspace, name)?.vars,
+            ..Variables::default()
+        };
+        let raw = vars.environment.clone();
+        raw.into_iter()
+            .map(|(key, value)| {
+                let value = vars.resolve(&value)?;
+                Ok((key, vars.redactor.redact(&value)))
+            })
+            .collect()
     }
 }

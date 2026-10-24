@@ -45,14 +45,14 @@ pub fn run(ctx: &Context, args: SecretArgs) -> anyhow::Result<()> {
         SecretAction::Rm { name } => secrets::delete(&name)?,
         SecretAction::Ls => {
             let root = workspace::find_root(&std::env::current_dir()?)?;
-            let found = secrets::workspace_references(&root)?;
+            let found = secrets::referenced_in_workspace(&root)?;
             if ctx.is_json {
                 let values = found
                     .iter()
                     .map(|name| {
                         Ok(serde_json::json!({
                             "name": name,
-                            "is_set": is_set(name)?,
+                            "is_set": secrets::is_set(name)?,
                         }))
                     })
                     .collect::<anyhow::Result<Vec<_>>>()?;
@@ -62,21 +62,17 @@ pub fn run(ctx: &Context, args: SecretArgs) -> anyhow::Result<()> {
                     writeln!(
                         std::io::stdout(),
                         "{name}\t{}",
-                        if is_set(&name)? { "set" } else { "missing" }
+                        if secrets::is_set(&name)? {
+                            "set"
+                        } else {
+                            "missing"
+                        }
                     )?;
                 }
             }
         }
     }
     Ok(())
-}
-
-fn is_set(name: &str) -> anyhow::Result<bool> {
-    match secrets::get(name) {
-        Ok(_) => Ok(true),
-        Err(kestrl_core::Error::SecretNotSet { .. }) => Ok(false),
-        Err(error) => Err(error.into()),
-    }
 }
 
 fn read_hidden() -> anyhow::Result<String> {

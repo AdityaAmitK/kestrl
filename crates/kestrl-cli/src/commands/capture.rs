@@ -61,7 +61,7 @@ pub fn run(ctx: &Context, args: CaptureArgs) -> anyhow::Result<()> {
     };
     let names = root
         .as_ref()
-        .map(|path| kestrl_core::secrets::workspace_references(path))
+        .map(|path| kestrl_core::secrets::referenced_in_workspace(path))
         .transpose()?
         .unwrap_or_default();
     eprintln!(

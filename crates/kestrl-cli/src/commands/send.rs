@@ -5,13 +5,10 @@ use std::path::{Path, PathBuf};
 
 use anyhow::bail;
 use clap::Args;
-use kestrl_core::env::Environment;
-use kestrl_core::history::{EventMeta, History, NewHttpEvent, RetentionOptions};
+use kestrl_core::history::{EventMeta, History, RetentionOptions};
 use kestrl_core::http;
-use kestrl_core::request;
-use kestrl_core::secrets;
-use kestrl_core::vars::Variables;
-use kestrl_core::workspace::{self, WorkspaceConfig};
+use kestrl_core::send::{self as core_send, SendOptions, Target};
+use kestrl_core::workspace;
 
 use crate::commands::output;
 use crate::context::Context;
@@ -52,63 +49,34 @@ pub fn send_one_with_client(
     correlation: Option<&str>,
 ) -> anyhow::Result<Sent> {
     let root = workspace_root()?;
-    let config = WorkspaceConfig::load(&root)?;
-    let env_name = resolve.env.as_deref().or(config.default_env.as_deref());
-    let env_name = env_name.unwrap_or("local");
-    let environment = match Environment::load(&root, env_name) {
-        Ok(environment) => environment.vars,
-        Err(kestrl_core::Error::Read { source, .. })
-            if resolve.env.is_none()
-                && config.default_env.is_none()
-                && source.kind() == std::io::ErrorKind::NotFound =>
-        {
-            BTreeMap::new()
+    let target = if target.len() == 2 {
+        Target::AdHoc {
+            method: target[0].clone(),
+            url: target[1].clone(),
         }
-        Err(kestrl_core::Error::Read { source, .. })
-            if source.kind() == std::io::ErrorKind::NotFound =>
-        {
-            let available = Environment::names(&root)?.join(", ");
-            return Err(kestrl_core::Error::EnvironmentNotFound {
-                name: env_name.to_owned(),
-                available,
-            }
-            .into());
+    } else {
+        Target::File(PathBuf::from(&target[0]))
+    };
+    let options = SendOptions {
+        source: "cli".to_owned(),
+        actor: ctx.actor.as_str().to_owned(),
+        env: resolve.env.clone(),
+        profiles: resolve.profiles.clone(),
+        vars: parse_vars(&resolve.vars)?,
+        correlation: correlation.map(str::to_owned),
+    };
+    let sent = core_send::send(&root, target, &options, client)?;
+    let event_id = match sent.event {
+        Ok(id) => Some(id),
+        Err(error) => {
+            output::warn(&format!("history event not recorded: {error}"));
+            None
         }
-        Err(error) => return Err(error.into()),
     };
-    let vars = Variables {
-        overrides: parse_vars(&resolve.vars)?,
-        environment,
-        workspace: config.vars.clone(),
-        redactor: secrets::Redactor::default(),
-    };
-    let request_ref = if target.len() == 2 {
-        None
-    } else {
-        Some(request_ref(&root, &target[0])?)
-    };
-    let request_file = if target.len() == 2 {
-        request::ad_hoc(&target[0], &target[1])
-    } else {
-        request::load(Path::new(&target[0]))?
-    };
-    let resolved = request::resolve(
-        request_file,
-        &root,
-        &config,
-        env_name,
-        &resolve.profiles,
-        vars,
-    )?;
-    let exchange = http::send(client, resolved)?;
-    let meta = event_meta(
-        ctx,
-        &root,
-        resolve.env.clone().or(config.default_env.clone()),
-        request_ref,
-    );
-    let event_id = record(&exchange, meta, &config.retention, correlation);
-    Ok(Sent { exchange, event_id })
+    Ok(Sent {
+        exchange: sent.exchange,
+        event_id,
+    })
 }
 
 /// The workspace root, or the current directory when there is no workspace.
@@ -142,30 +110,13 @@ pub fn record(
     retention: &RetentionOptions,
     correlation: Option<&str>,
 ) -> Option<String> {
-    let result = History::open_default().and_then(|mut history| {
-        let session_id = history.current_session()?.map(|session| session.id);
-        let event = NewHttpEvent {
-            correlation: correlation.map(str::to_owned),
-            ..NewHttpEvent::from_exchange(exchange, EventMeta { session_id, ..meta })
-        };
-        history.record_http(&event, retention)
-    });
-    match result {
+    match core_send::record(exchange, meta, retention, correlation) {
         Ok(id) => Some(id),
         Err(error) => {
             output::warn(&format!("history event not recorded: {error}"));
             None
         }
     }
-}
-
-/// The request file path relative to the workspace root, or absolute if it lies outside.
-fn request_ref(root: &Path, path: &str) -> anyhow::Result<String> {
-    let absolute = std::env::current_dir()?.join(path);
-    Ok(absolute.strip_prefix(root).map_or_else(
-        |_| absolute.display().to_string(),
-        |relative| relative.display().to_string(),
-    ))
 }
 
 fn parse_vars(values: &[String]) -> anyhow::Result<BTreeMap<String, String>> {
