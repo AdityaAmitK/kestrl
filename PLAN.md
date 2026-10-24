@@ -203,7 +203,7 @@ kestrl db connections
 
 # Capture
 kestrl capture sim|android|browser [--save]
-kestrl capture browser [--browser chrome|arc|brave|edge|chromium] [--url <start-url>] [--save] [--host <glob>]
+kestrl capture browser [--browser chrome|arc|brave|edge|chromium|helium] [--browser-path <path>] [--url <start-url>] [--save] [--host <glob>]
 kestrl capture port <port> [--save]
 kestrl proxy trust --sim|--android          # install or stage the Kestrl root certificate
 kestrl proxy ca                             # show the root certificate path and fingerprint

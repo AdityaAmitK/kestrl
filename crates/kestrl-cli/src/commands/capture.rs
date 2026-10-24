@@ -32,8 +32,11 @@ enum DeviceCommand {
 #[derive(Debug, Args)]
 struct BrowserOptions {
     /// Chromium browser to launch
-    #[arg(long, value_parser = ["chrome", "arc", "brave", "edge", "chromium"])]
+    #[arg(long, value_parser = ["chrome", "arc", "brave", "edge", "chromium", "helium"])]
     browser: Option<String>,
+    /// Browser bundle or executable path
+    #[arg(long)]
+    browser_path: Option<std::path::PathBuf>,
     /// Initial URL
     #[arg(long)]
     url: Option<String>,
@@ -242,14 +245,19 @@ fn run_browser(ctx: &Context, options: BrowserOptions) -> anyhow::Result<()> {
         "arc" => kestrl_core::capture::browser::Browser::Arc,
         "brave" => kestrl_core::capture::browser::Browser::Brave,
         "edge" => kestrl_core::capture::browser::Browser::Edge,
-        _ => kestrl_core::capture::browser::Browser::Chromium,
+        "chromium" => kestrl_core::capture::browser::Browser::Chromium,
+        _ => kestrl_core::capture::browser::Browser::Helium,
     });
     let profile =
         kestrl_core::capture::browser::run(kestrl_core::capture::browser::BrowserOptions {
             browser,
+            browser_path: options.browser_path,
             url: options.url,
             hosts: options.host,
             callback,
+            profile_callback: Arc::new(|profile| {
+                eprintln!("Browser capture isolated profile: {}", profile.display());
+            }),
         })?;
     eprintln!(
         "Browser capture used isolated profile: {}",

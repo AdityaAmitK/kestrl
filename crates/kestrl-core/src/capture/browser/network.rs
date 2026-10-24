@@ -45,7 +45,7 @@ impl NetworkCapture {
             "Network.requestWillBeSent" => {
                 let request = &params["request"];
                 let url = request["url"].as_str().unwrap_or_default();
-                if url.starts_with("data:") {
+                if !(url.starts_with("http://") || url.starts_with("https://")) {
                     return Ok(None);
                 }
                 let host = url
