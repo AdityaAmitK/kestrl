@@ -1,0 +1,7 @@
+name = "httpbin GET"
+method = "GET"
+url = "{{api_url}}/get"
+profiles = ["json"]
+
+[query]
+source = "kestrl-example"

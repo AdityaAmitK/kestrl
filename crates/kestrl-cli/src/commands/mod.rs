@@ -2,6 +2,7 @@
 
 pub mod envs;
 pub mod history;
+pub mod output;
 pub mod profiles;
 pub mod run;
 pub mod secret;

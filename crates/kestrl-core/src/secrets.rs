@@ -14,6 +14,10 @@ pub fn set(name: &str, value: &str) -> Result<()> {
     Ok(keyring::Entry::new(SERVICE, name)?.set_password(value)?)
 }
 
+pub fn delete(name: &str) -> Result<()> {
+    Ok(keyring::Entry::new(SERVICE, name)?.delete_credential()?)
+}
+
 /// Collects resolved secret values and replaces them in any outgoing text.
 #[derive(Default)]
 pub struct Redactor {

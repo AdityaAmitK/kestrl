@@ -1,17 +1,65 @@
 //! `kestrl run`: send every request in a collection, in order.
 
 use clap::Args;
+use kestrl_core::http;
+use std::io::Write;
 
 use crate::context::Context;
 
 #[derive(Debug, Args)]
 pub struct RunArgs {
-    /// Collection directory
     pub dir: std::path::PathBuf,
     #[command(flatten)]
     pub resolve: crate::commands::ResolveArgs,
 }
 
-pub fn run(_ctx: &Context, _args: RunArgs) -> anyhow::Result<()> {
-    anyhow::bail!("`kestrl run` is not implemented yet")
+pub fn run(ctx: &Context, args: RunArgs) -> anyhow::Result<()> {
+    let mut paths = std::fs::read_dir(&args.dir)?
+        .filter_map(|entry| entry.ok().map(|entry| entry.path()))
+        .filter(|path| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.ends_with(".req.toml"))
+        })
+        .collect::<Vec<_>>();
+    paths.sort();
+    let mut results = Vec::new();
+    for path in paths {
+        let exchange = super::send::send_one(ctx, &[path.display().to_string()], &args.resolve)?;
+        if !ctx.is_json {
+            writeln!(
+                std::io::stdout(),
+                "{} {} {} ({} ms)",
+                path.display(),
+                exchange
+                    .status
+                    .map_or_else(|| "failed".to_owned(), |status| status.to_string()),
+                if exchange.error.is_some() || exchange.status.is_none_or(|status| status >= 400) {
+                    "failed"
+                } else {
+                    "ok"
+                },
+                exchange.duration_ms
+            )?;
+        }
+        results.push(exchange);
+    }
+    if ctx.is_json {
+        writeln!(
+            std::io::stdout(),
+            "{}",
+            serde_json::to_string_pretty(
+                &results
+                    .iter()
+                    .map(super::output::exchange_json)
+                    .collect::<Vec<_>>()
+            )?
+        )?;
+    }
+    if results.iter().any(|exchange: &http::Exchange| {
+        exchange.error.is_some() || exchange.status.is_none_or(|status| status >= 400)
+    }) {
+        anyhow::bail!("one or more requests failed");
+    }
+    Ok(())
 }

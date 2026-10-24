@@ -22,4 +22,26 @@ impl Environment {
         })?;
         toml::from_str(&text).map_err(|source| Error::Toml { path, source })
     }
+
+    pub fn names(workspace: &Path) -> Result<Vec<String>> {
+        let dir = workspace.join(".kestrl/envs");
+        let mut names = std::fs::read_dir(&dir)
+            .map_err(|source| Error::Read {
+                path: dir.clone(),
+                source,
+            })?
+            .filter_map(|entry| entry.ok().map(|entry| entry.path()))
+            .filter(|path| {
+                path.extension()
+                    .is_some_and(|extension| extension == "toml")
+            })
+            .filter_map(|path| {
+                path.file_stem()
+                    .and_then(|stem| stem.to_str())
+                    .map(str::to_owned)
+            })
+            .collect::<Vec<_>>();
+        names.sort();
+        Ok(names)
+    }
 }

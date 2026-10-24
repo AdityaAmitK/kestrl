@@ -6,3 +6,4 @@ All notable changes are documented here. The format follows [Keep a Changelog](h
 
 ### Added
 - Project plan, cargo workspace scaffold, and open-source project files.
+- HTTP request sending, collections, workspace variables, profiles, and Keychain secret management.
