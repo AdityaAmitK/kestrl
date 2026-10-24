@@ -17,7 +17,6 @@ rpassword.workspace = true
 clap.workspace = true
 regex.workspace = true
 time.workspace = true
-tokio.workspace = true
 ctrlc.workspace = true
 
 [lints]

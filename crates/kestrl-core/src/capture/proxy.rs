@@ -23,8 +23,6 @@ const MAX_CAPTURE_BODY_BYTES: usize = 1024 * 1024;
 pub struct ProxyOptions {
     /// TCP port to bind on loopback.
     pub port: u16,
-    /// Already-bound loopback listener.
-    pub listener: TcpListener,
     /// Optional host glob filters.
     pub hosts: Vec<String>,
     /// Receives completed HTTP exchanges.
@@ -208,9 +206,9 @@ fn read_limited(reader: impl Read) -> Vec<u8> {
 /// Run the HTTPS interception proxy on a pre-bound loopback listener.
 pub fn run(
     options: ProxyOptions,
-    shutdown: tokio::sync::oneshot::Receiver<()>,
-    ready: tokio::sync::oneshot::Sender<()>,
-) -> Result<()> {
+    listener: TcpListener,
+    shutdown: impl std::future::Future<Output = ()> + Send + 'static,
+) -> Result<tokio::task::JoinHandle<Result<()>>> {
     let paths = super::ca::ensure()?;
     let certificate = std::fs::read_to_string(paths.certificate)?;
     let private_key = std::fs::read_to_string(paths.private_key)?;
@@ -224,27 +222,19 @@ pub fn run(
         hosts: options.hosts,
         tunneled_hosts: Arc::new(Mutex::new(HashSet::new())),
     };
-    let runtime = tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()
-        .map_err(|error| Error::Capture(error.to_string()))?;
-    let listener = options.listener;
-    runtime.block_on(async move {
+    let task = tokio::spawn(async move {
         let proxy = Proxy::builder()
             .with_listener(listener)
             .with_ca(authority)
             .with_rustls_connector(aws_lc_rs::default_provider())
             .with_http_handler(handler)
-            .with_graceful_shutdown(async move {
-                let _ = shutdown.await;
-            })
+            .with_graceful_shutdown(shutdown)
             .build()
             .map_err(|error| Error::Capture(error.to_string()))?;
-        let server = tokio::spawn(proxy.start());
-        let _ = ready.send(());
-        server
+        proxy
+            .start()
             .await
-            .map_err(|error| Error::Capture(error.to_string()))?
             .map_err(|error| Error::Capture(error.to_string()))
-    })
+    });
+    Ok(task)
 }
