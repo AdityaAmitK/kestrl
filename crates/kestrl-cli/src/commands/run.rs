@@ -27,12 +27,14 @@ pub fn run(ctx: &Context, args: RunArgs) -> anyhow::Result<()> {
     paths.sort();
     let mut results = Vec::new();
     for path in paths {
-        let exchange = super::send::send_one_with_client(
+        let sent = super::send::send_one_with_client(
             ctx,
             &[path.display().to_string()],
             &args.resolve,
             &client,
+            None,
         )?;
+        let exchange = &sent.exchange;
         if !ctx.is_json {
             writeln!(
                 std::io::stdout(),
@@ -49,15 +51,18 @@ pub fn run(ctx: &Context, args: RunArgs) -> anyhow::Result<()> {
                 exchange.duration_ms
             )?;
         }
-        results.push(exchange);
+        results.push(sent);
     }
     if ctx.is_json {
         super::output::print_json(&serde_json::Value::Array(
-            results.iter().map(super::output::exchange_json).collect(),
+            results
+                .iter()
+                .map(|sent| super::output::exchange_json(&sent.exchange, sent.event_id.as_deref()))
+                .collect(),
         ))?;
     }
-    if results.iter().any(|exchange: &http::Exchange| {
-        exchange.error.is_some() || exchange.status.is_none_or(|status| status >= 400)
+    if results.iter().any(|sent| {
+        sent.exchange.error.is_some() || sent.exchange.status.is_none_or(|status| status >= 400)
     }) {
         anyhow::bail!("one or more requests failed");
     }
