@@ -12,6 +12,8 @@ struct AutosavingSplit<First: View, Second: View>: NSViewRepresentable {
     let axis: Axis
     /// The first pane's share of the space until the user moves the divider
     let defaultFraction: CGFloat
+    /// The narrowest the first pane can be dragged, and the least it starts with
+    let firstPaneMinimum: CGFloat
     let first: First
     let second: Second
 
@@ -19,12 +21,14 @@ struct AutosavingSplit<First: View, Second: View>: NSViewRepresentable {
         autosaveName: String,
         axis: Axis,
         defaultFraction: CGFloat,
+        firstPaneMinimum: CGFloat = minimumPaneSize,
         @ViewBuilder first: () -> First,
         @ViewBuilder second: () -> Second
     ) {
         self.autosaveName = autosaveName
         self.axis = axis
         self.defaultFraction = defaultFraction
+        self.firstPaneMinimum = firstPaneMinimum
         self.first = first()
         self.second = second()
     }
@@ -46,18 +50,20 @@ struct AutosavingSplit<First: View, Second: View>: NSViewRepresentable {
         secondHost.sizingOptions = []
         split.addSubview(firstHost)
         split.addSubview(secondHost)
+        context.coordinator.firstPaneMinimum = firstPaneMinimum
         context.coordinator.firstHost = firstHost
         context.coordinator.secondHost = secondHost
 
         split.autosaveName = autosaveName
         let savedKey = "NSSplitView Subview Frames \(autosaveName)"
         let defaultFraction = defaultFraction
+        let firstPaneMinimum = firstPaneMinimum
         DispatchQueue.main.async {
             // Only a first launch lays out at the default; later launches keep the saved divider.
             guard UserDefaults.standard.object(forKey: savedKey) == nil else { return }
             split.layoutSubtreeIfNeeded()
             let total = split.isVertical ? split.bounds.width : split.bounds.height
-            split.setPosition(total * defaultFraction, ofDividerAt: 0)
+            split.setPosition(max(total * defaultFraction, firstPaneMinimum), ofDividerAt: 0)
         }
         return split
     }
@@ -71,13 +77,14 @@ struct AutosavingSplit<First: View, Second: View>: NSViewRepresentable {
     final class Coordinator: NSObject, NSSplitViewDelegate {
         var firstHost: NSHostingView<First>?
         var secondHost: NSHostingView<Second>?
+        var firstPaneMinimum = minimumPaneSize
 
         func splitView(
             _ splitView: NSSplitView,
             constrainMinCoordinate proposedMinimumPosition: CGFloat,
             ofSubviewAt dividerIndex: Int
         ) -> CGFloat {
-            proposedMinimumPosition + minimumPaneSize
+            proposedMinimumPosition + (dividerIndex == 0 ? firstPaneMinimum : minimumPaneSize)
         }
 
         func splitView(
