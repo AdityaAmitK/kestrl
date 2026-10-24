@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// The main window: an empty state until a workspace is open, then the three-column split view.
+/// The main window: an empty state until a workspace is open, then the sidebar beside the open section.
+/// Each section lays out its own panes, so History can give its table the full width.
 struct ContentView: View {
     @Bindable var store: WorkspaceStore
 
@@ -33,13 +34,12 @@ struct ContentView: View {
     private var workspaceView: some View {
         NavigationSplitView {
             SidebarView(store: store)
-        } content: {
-            contentColumn
         } detail: {
-            detailColumn
+            sectionView
         }
         .navigationSplitViewStyle(.balanced)
         .navigationTitle(workspaceName)
+        .navigationSubtitle(store.section.title)
         .toolbar {
             toolbarItems
         }
@@ -59,42 +59,39 @@ struct ContentView: View {
         store.workspace.map { URL(fileURLWithPath: $0.root).lastPathComponent } ?? "Kestrl"
     }
 
-    @ViewBuilder private var contentColumn: some View {
+    @ViewBuilder private var sectionView: some View {
         switch store.section {
-        case .requests: RequestsContentView(store: store)
-        case .history: HistoryContentView(store: store)
-        case .environments: EnvironmentsContentView(store: store)
-        case .secrets: SecretsContentView(store: store)
-        }
-    }
-
-    @ViewBuilder private var detailColumn: some View {
-        switch store.section {
-        case .requests: RequestsDetailView(store: store)
-        case .history: HistoryDetailView(store: store)
-        case .environments: EnvironmentDetailView(store: store)
-        case .secrets: SecretDetailView(store: store)
+        case .requests:
+            AutosavingSplit(autosaveName: "kestrl.requests.list", axis: .horizontal, defaultFraction: 0.3) {
+                RequestsContentView(store: store)
+            } second: {
+                RequestsDetailView(store: store)
+            }
+        case .history:
+            AutosavingSplit(autosaveName: "kestrl.history.events", axis: .vertical, defaultFraction: 0.5) {
+                HistoryContentView(store: store)
+            } second: {
+                HistoryDetailView(store: store)
+            }
+        case .environments:
+            AutosavingSplit(autosaveName: "kestrl.environments.list", axis: .horizontal, defaultFraction: 0.35) {
+                EnvironmentsContentView(store: store)
+            } second: {
+                EnvironmentDetailView(store: store)
+            }
+        case .secrets:
+            AutosavingSplit(autosaveName: "kestrl.secrets.list", axis: .horizontal, defaultFraction: 0.35) {
+                SecretsContentView(store: store)
+            } second: {
+                SecretDetailView(store: store)
+            }
         }
     }
 
     @ToolbarContentBuilder private var toolbarItems: some ToolbarContent {
-        ToolbarItem {
-            EnvironmentMenu(store: store)
-        }
         if store.section == .requests {
             ToolbarItem {
-                Button {
-                    Task { await store.sendSelectedRequest() }
-                } label: {
-                    Label("Send", systemImage: "paperplane.fill")
-                }
-                .help("Send the selected request (⌘↩)")
-                .disabled(store.selectedRequest == nil || store.isSending)
-            }
-        }
-        if store.section == .requests || store.section == .history {
-            ToolbarItem {
-                CopyJSONButton(store: store)
+                EnvironmentMenu(store: store)
             }
         }
     }

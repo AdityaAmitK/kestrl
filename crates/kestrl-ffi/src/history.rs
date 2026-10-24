@@ -32,6 +32,12 @@ pub struct EventSummary {
     pub env: Option<String>,
     pub summary: String,
     pub tags: Vec<String>,
+    /// HTTP events only
+    pub method: Option<String>,
+    /// HTTP events only; unset when the request failed before a response
+    pub status: Option<u16>,
+    /// HTTP events only
+    pub duration_ms: Option<u64>,
 }
 
 #[derive(Debug, uniffi::Record)]
@@ -137,6 +143,9 @@ impl From<kestrl_core::history::EventSummary> for EventSummary {
             env: event.env,
             summary: event.summary,
             tags: event.tags,
+            method: event.method,
+            status: event.status,
+            duration_ms: event.duration_ms,
         }
     }
 }

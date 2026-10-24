@@ -15,7 +15,10 @@ struct EnvironmentMenu: View {
         } label: {
             Label(store.selectedEnvironment ?? "No environment", systemImage: "globe")
         }
+        .labelStyle(.titleAndIcon)
+        .menuIndicator(.visible)
         .help("Environment for sends")
+        .accessibilityLabel("Environment: \(store.selectedEnvironment ?? "none")")
         .disabled(store.workspace == nil)
     }
 }
