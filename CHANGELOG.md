@@ -4,6 +4,9 @@ All notable changes are documented here. The format follows [Keep a Changelog](h
 
 ## [Unreleased]
 
+### Fixed
+- Browser capture removes abandoned `kestrl-browser-*` temporary profiles when no browser process is using them; device and browser capture lines display full URLs without default HTTP(S) ports.
+
 ### Added
 - `kestrl capture browser`: launch an isolated Chromium-family browser and capture HTTP exchanges through Chrome DevTools Protocol, with optional host filters and history recording.
 - Browser capture detects browser bundle executables from Info.plist in `/Applications` and `~/Applications`, supports Helium, and accepts `--browser-path` for other Chromium-family browsers.

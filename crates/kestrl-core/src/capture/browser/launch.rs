@@ -19,6 +19,8 @@ pub(super) struct BrowserProcess {
 impl BrowserProcess {
     /// Start a browser with a fresh, isolated profile and return its DevTools port.
     pub fn start(browser: Option<Browser>, browser_path: Option<&Path>) -> Result<Self> {
+        // Best effort: a leftover profile must never block a new capture.
+        let _ = remove_stale_profiles(&std::env::temp_dir());
         let (application, binary) = executable(browser, browser_path)?;
         let profile = std::env::temp_dir().join(format!("kestrl-browser-{}", ulid::Ulid::new()));
         fs::create_dir_all(&profile)?;
@@ -74,6 +76,30 @@ impl BrowserProcess {
     pub fn has_exited(&mut self) -> Result<bool> {
         Ok(self.child.try_wait()?.is_some())
     }
+}
+
+/// Remove abandoned Kestrl browser profiles that no running process is using.
+fn remove_stale_profiles(temp_dir: &Path) -> Result<()> {
+    let entries = fs::read_dir(temp_dir)?;
+    for entry in entries {
+        let entry = entry?;
+        let path = entry.path();
+        let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
+            continue;
+        };
+        if !name.starts_with("kestrl-browser-") || !entry.file_type()?.is_dir() {
+            continue;
+        }
+        let argument = format!("--user-data-dir={}", path.display());
+        let in_use = Command::new("pgrep")
+            .args(["-f", "--", &argument])
+            .status()
+            .is_ok_and(|status| status.success());
+        if !in_use {
+            fs::remove_dir_all(path)?;
+        }
+    }
+    Ok(())
 }
 
 fn executable(

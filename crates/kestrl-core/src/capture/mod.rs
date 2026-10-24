@@ -32,6 +32,27 @@ pub struct CapturedExchange {
     pub tunneled: bool,
 }
 
+/// Format a captured URL for display, omitting default HTTP and HTTPS ports.
+pub fn display_url(url: &str) -> String {
+    let Some((scheme, remainder)) = url.split_once("://") else {
+        return url.to_owned();
+    };
+    let authority_end = remainder.find(['/', '?', '#']).unwrap_or(remainder.len());
+    let authority = &remainder[..authority_end];
+    let default_port = match scheme {
+        "https" => ":443",
+        "http" => ":80",
+        _ => return url.to_owned(),
+    };
+    let Some(host) = authority.strip_suffix(default_port) else {
+        return url.to_owned();
+    };
+    if host.is_empty() || host.contains('@') {
+        return url.to_owned();
+    }
+    format!("{scheme}://{host}{}", &remainder[authority_end..])
+}
+
 /// Redact secrets and credential headers from a captured exchange.
 pub fn redact(
     mut exchange: CapturedExchange,
