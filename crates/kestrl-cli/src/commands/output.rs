@@ -48,10 +48,7 @@ pub fn warn(message: &str) {
 
 /// Print one live capture line using the CLI's local timestamp offset.
 pub fn print_capture_line(exchange: &CapturedExchange, offset: UtcOffset) {
-    let path = exchange
-        .url
-        .split_once("://")
-        .map_or(exchange.url.as_str(), |(_, rest)| rest);
+    let url = kestrl_core::capture::display_url(&exchange.url);
     let status = if exchange.tunneled {
         "-".to_owned()
     } else {
@@ -67,7 +64,7 @@ pub fn print_capture_line(exchange: &CapturedExchange, offset: UtcOffset) {
         exchange.method,
         status,
         exchange.duration_ms,
-        path,
+        url,
         tunnel
     );
 }
