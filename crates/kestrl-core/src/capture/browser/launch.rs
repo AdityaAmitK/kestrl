@@ -19,7 +19,8 @@ pub(super) struct BrowserProcess {
 impl BrowserProcess {
     /// Start a browser with a fresh, isolated profile and return its DevTools port.
     pub fn start(browser: Option<Browser>, browser_path: Option<&Path>) -> Result<Self> {
-        remove_stale_profiles(&std::env::temp_dir())?;
+        // Best effort: a leftover profile must never block a new capture.
+        let _ = remove_stale_profiles(&std::env::temp_dir());
         let (application, binary) = executable(browser, browser_path)?;
         let profile = std::env::temp_dir().join(format!("kestrl-browser-{}", ulid::Ulid::new()));
         fs::create_dir_all(&profile)?;
