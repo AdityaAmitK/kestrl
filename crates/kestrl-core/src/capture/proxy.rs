@@ -2,7 +2,6 @@
 
 use std::collections::HashSet;
 use std::io::Read;
-use std::net::{Ipv4Addr, SocketAddr};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
@@ -12,6 +11,7 @@ use hudsucker::hyper::{Request, Response};
 use hudsucker::rcgen::{Issuer, KeyPair};
 use hudsucker::rustls::crypto::aws_lc_rs;
 use hudsucker::{Body, HttpContext, HttpHandler, Proxy, RequestOrResponse};
+use tokio::net::TcpListener;
 
 use super::CapturedExchange;
 use crate::history::now_ms;
@@ -20,10 +20,11 @@ use crate::{Error, Result};
 const MAX_CAPTURE_BODY_BYTES: usize = 1024 * 1024;
 
 /// Options for starting the capture proxy.
-#[derive(Clone)]
 pub struct ProxyOptions {
     /// TCP port to bind on loopback.
     pub port: u16,
+    /// Already-bound loopback listener.
+    pub listener: TcpListener,
     /// Optional host glob filters.
     pub hosts: Vec<String>,
     /// Receives completed HTTP exchanges.
@@ -204,8 +205,12 @@ fn read_limited(reader: impl Read) -> Vec<u8> {
     decoded
 }
 
-/// Run the HTTPS interception proxy until Ctrl-C or SIGTERM.
-pub fn run(options: ProxyOptions) -> Result<()> {
+/// Run the HTTPS interception proxy on a pre-bound loopback listener.
+pub fn run(
+    options: ProxyOptions,
+    shutdown: tokio::sync::oneshot::Receiver<()>,
+    ready: tokio::sync::oneshot::Sender<()>,
+) -> Result<()> {
     let paths = super::ca::ensure()?;
     let certificate = std::fs::read_to_string(paths.certificate)?;
     let private_key = std::fs::read_to_string(paths.private_key)?;
@@ -223,26 +228,23 @@ pub fn run(options: ProxyOptions) -> Result<()> {
         .enable_all()
         .build()
         .map_err(|error| Error::Capture(error.to_string()))?;
+    let listener = options.listener;
     runtime.block_on(async move {
-        let mut terminate =
-            tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
-                .map_err(|error| Error::Capture(error.to_string()))?;
-        let shutdown = async move {
-            tokio::select! {
-                _ = tokio::signal::ctrl_c() => (),
-                _ = terminate.recv() => (),
-            }
-        };
-        Proxy::builder()
-            .with_addr(SocketAddr::from((Ipv4Addr::LOCALHOST, options.port)))
+        let proxy = Proxy::builder()
+            .with_listener(listener)
             .with_ca(authority)
             .with_rustls_connector(aws_lc_rs::default_provider())
             .with_http_handler(handler)
-            .with_graceful_shutdown(shutdown)
+            .with_graceful_shutdown(async move {
+                let _ = shutdown.await;
+            })
             .build()
-            .map_err(|error| Error::Capture(error.to_string()))?
-            .start()
+            .map_err(|error| Error::Capture(error.to_string()))?;
+        let server = tokio::spawn(proxy.start());
+        let _ = ready.send(());
+        server
             .await
+            .map_err(|error| Error::Capture(error.to_string()))?
             .map_err(|error| Error::Capture(error.to_string()))
     })
 }

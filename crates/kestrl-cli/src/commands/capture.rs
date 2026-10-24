@@ -50,34 +50,43 @@ pub fn run(ctx: &Context, args: CaptureArgs) -> anyhow::Result<()> {
     let cwd = std::env::current_dir()?;
     let root = workspace::find_root(&cwd)?;
     let workspace_config = WorkspaceConfig::load(&root)?;
-    let paths = capture::ca::ensure().context("create Kestrl root CA")?;
+    capture::ca::ensure().context("create Kestrl root CA")?;
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .context("prepare capture runtime")?;
+    let interrupt = runtime
+        .block_on(async {
+            tokio::signal::unix::signal(tokio::signal::unix::SignalKind::interrupt())
+        })
+        .context("install SIGINT handler")?;
+    let terminate = runtime
+        .block_on(async {
+            tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+        })
+        .context("install SIGTERM handler")?;
     capture::system_proxy::restore().context("restore stale system proxy state")?;
     let history = if options.save {
         Some(Mutex::new(History::open_default()?))
     } else {
         None
     };
-    if simulator {
-        capture::system_proxy::enable(options.port).context("enable macOS system proxy")?;
-    } else {
-        capture::device::start_android(options.port).context("configure Android emulator proxy")?;
-    }
-    let proxy_guard = if simulator {
-        Some(capture::system_proxy::SystemProxyGuard::new())
-    } else {
-        None
-    };
-    if simulator {
-        eprintln!("Install the Kestrl root certificate with `kestrl proxy trust --sim`.");
-    } else {
-        eprintln!("Install the Kestrl root certificate with `kestrl proxy trust --android`.");
-    }
+    let names = kestrl_core::secrets::workspace_references(&root)?;
+    eprintln!(
+        "Reading {} workspace secrets from the Keychain for masking…",
+        names.len()
+    );
     let redactor = Arc::new(kestrl_core::secrets::workspace_redactor(&root)?);
     let actor = ctx.actor.as_str().to_owned();
     let json = ctx.is_json;
     let offset = ctx.utc_offset;
     let root_string = root.to_string_lossy().into_owned();
     let retention = workspace_config.retention;
+    if simulator {
+        eprintln!("Install the Kestrl root certificate with `kestrl proxy trust --sim`.");
+    } else {
+        eprintln!("Install the Kestrl root certificate with `kestrl proxy trust --android`.");
+    }
     let callback = Arc::new(move |exchange: CapturedExchange| {
         let exchange = capture::redact(exchange, &redactor);
         if let Some(history) = &history {
@@ -141,23 +150,108 @@ pub fn run(ctx: &Context, args: CaptureArgs) -> anyhow::Result<()> {
             );
         }
     });
-    eprintln!(
-        "Kestrl capture proxy listening on 127.0.0.1:{} (CA: {})",
+    let listener = std::net::TcpListener::bind(std::net::SocketAddr::from((
+        std::net::Ipv4Addr::LOCALHOST,
         options.port,
-        paths.certificate.display()
-    );
-    let result = capture::proxy::run(ProxyOptions {
+    )))?;
+    listener.set_nonblocking(true)?;
+    let listener = tokio::net::TcpListener::from_std(listener)?;
+    let (shutdown_sender, shutdown_receiver) = tokio::sync::oneshot::channel();
+    let (ready_sender, ready_receiver) = tokio::sync::oneshot::channel();
+    let proxy_options = ProxyOptions {
         port: options.port,
+        listener,
         hosts: options.host,
         callback,
+    };
+    let server = std::thread::spawn(move || {
+        capture::proxy::run(proxy_options, shutdown_receiver, ready_sender)
     });
-    drop(proxy_guard);
+    if simulator {
+        let proxy_guard = capture::system_proxy::SystemProxyGuard::new();
+        if let Err(error) = runtime.block_on(ready_receiver) {
+            let _ = capture::system_proxy::restore();
+            return Err(anyhow::anyhow!("start capture proxy listener: {error}"));
+        }
+        capture::system_proxy::enable(options.port).context("enable macOS system proxy")?;
+        run_live_capture(
+            runtime,
+            server,
+            shutdown_sender,
+            interrupt,
+            terminate,
+            proxy_guard,
+            (simulator, options.port),
+        )
+    } else {
+        runtime
+            .block_on(ready_receiver)
+            .context("start capture proxy listener")?;
+        capture::device::start_android(options.port).context("configure Android emulator proxy")?;
+        run_live_capture(
+            runtime,
+            server,
+            shutdown_sender,
+            interrupt,
+            terminate,
+            (),
+            (simulator, options.port),
+        )
+    }
+}
+
+fn run_live_capture<G>(
+    runtime: tokio::runtime::Runtime,
+    server: std::thread::JoinHandle<kestrl_core::Result<()>>,
+    shutdown_sender: tokio::sync::oneshot::Sender<()>,
+    mut interrupt: tokio::signal::unix::Signal,
+    mut terminate: tokio::signal::unix::Signal,
+    guard: G,
+    options: (bool, u16),
+) -> anyhow::Result<()> {
+    let (simulator, port) = options;
+    if simulator {
+        eprintln!(
+            "Capturing on 127.0.0.1:{port} — system proxy enabled for active network services. Ctrl-C to stop."
+        );
+    } else {
+        eprintln!("Capturing Android emulator traffic on 127.0.0.1:{port}. Ctrl-C to stop.");
+    }
+    let (signal_sender, signal_receiver) = std::sync::mpsc::channel();
+    let signal_runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .context("prepare capture signal runtime")?;
+    let signal_waiter = std::thread::spawn(move || {
+        signal_runtime.block_on(async {
+            tokio::select! {
+                _ = terminate.recv() => (),
+                _ = interrupt.recv() => (),
+            }
+        });
+        let _ = signal_sender.send(());
+    });
+    loop {
+        if server.is_finished() {
+            break;
+        }
+        if signal_receiver.try_recv().is_ok() {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
     let cleanup = if simulator {
         capture::system_proxy::restore()
     } else {
         capture::device::stop_android()
     };
-    result.context("run capture proxy")?;
+    drop(guard);
+    let _ = shutdown_sender.send(());
+    server
+        .join()
+        .map_err(|_| anyhow::anyhow!("capture proxy task panicked"))??;
+    let _ = signal_waiter.join();
+    runtime.shutdown_background();
     cleanup.context("restore device proxy settings")?;
     Ok(())
 }
