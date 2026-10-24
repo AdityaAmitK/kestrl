@@ -5,6 +5,7 @@ Read `PLAN.md` first. Use its glossary terms exactly in code, CLI help and docs.
 ## Workflow
 - One feature = one branch (`feat/<name>`, `fix/<name>`) → PR to `main` → review → squash-merge.
 - Keep PRs small and single-purpose. Never push to `main` directly.
+- No AI attribution anywhere: no `Co-Authored-By` AI trailers and no "Generated with ..." lines in commits or PR bodies.
 - `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, and `cargo build` must pass.
 
 ## Code style (Rust) — follows the `rust-cli-agent-style` skill
