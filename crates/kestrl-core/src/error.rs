@@ -6,6 +6,8 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    #[error("workspace not found from {0}")]
+    WorkspaceNotFound(PathBuf),
     #[error("failed to read {path}")]
     Read {
         path: PathBuf,
@@ -18,6 +20,20 @@ pub enum Error {
         #[source]
         source: toml::de::Error,
     },
+    #[error("invalid request: {0}")]
+    InvalidRequest(String),
+    #[error("unknown variable: {0}")]
+    UnknownVariable(String),
+    #[error("environment \"{name}\" not found; available environments: {available}")]
+    EnvironmentNotFound { name: String, available: String },
+    #[error("secret \"{name}\" is not set — run: kestrl secret set {name}")]
+    SecretNotSet { name: String },
+    #[error("variable expansion cycle or depth limit at {0}")]
+    VariableCycle(String),
+    #[error("HTTP request failed: {0}")]
+    Http(#[from] reqwest::Error),
+    #[error("invalid HTTP method: {0}")]
+    InvalidMethod(String),
     #[error(transparent)]
     Io(#[from] std::io::Error),
     #[error(transparent)]
