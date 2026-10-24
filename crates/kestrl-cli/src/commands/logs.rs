@@ -4,7 +4,6 @@ use std::io;
 use std::io::Write;
 use std::path::PathBuf;
 
-use anyhow::Context as _;
 use anyhow::bail;
 use clap::ArgGroup;
 use clap::Args;
