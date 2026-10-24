@@ -1220,7 +1220,6 @@ dependencies = [
  "rpassword",
  "serde_json",
  "time",
- "tokio",
  "toml",
 ]
 
