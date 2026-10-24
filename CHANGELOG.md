@@ -6,6 +6,7 @@ All notable changes are documented here. The format follows [Keep a Changelog](h
 
 ### Fixed
 - macOS app: the list column of each section starts at 280 pt (220–420 pt) instead of about 45% of the window; the sidebar is 180–240 pt. Log lines stay on one row, with horizontal scrolling, unless View ▸ Wrap log lines (⌥⌘W) is on.
+- macOS app: auto-follow keeps log timestamps visible and only pauses on user scrolling; Clear resumes following new output.
 - Browser capture removes abandoned `kestrl-browser-*` temporary profiles when no browser process is using them; device and browser capture lines display full URLs without default HTTP(S) ports.
 
 ### Added

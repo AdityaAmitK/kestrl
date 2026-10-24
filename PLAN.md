@@ -223,6 +223,7 @@ The global `--json` option applies to database commands as well.
 3. **Database:** Postgres connections per environment, read-only by default, `db query` and `db tables`. Queries recorded in history.
 4. **Capture:** an HTTPS interception proxy with its own root certificate, device capture (iOS Simulator, Android emulator), browser capture (CDP), and port capture (plain HTTP on loopback). The interception proxy binds to loopback only. The system proxy must be restored on exit, and again on the next start after a crash; restore retries retain state until every saved service is restored. Device capture commands are `kestrl capture sim|android [--port] [--save] [--host]`; browser capture launches a separate Chromium-family browser with an isolated temporary profile.
 5. **GUI:** `kestrl-ffi` and the SwiftUI app: request editor, environment picker, history and timeline, log viewer, DB console, live capture, Copy JSON everywhere.
+   The macOS app keeps list columns at 220–420 pt (280 pt initially). Logs scroll horizontally by default; View ▸ Wrap log lines (⌥⌘W) enables wrapping. JSON objects with `level` and `message` show a level chip, message and remaining fields; Copy preserves the raw line.
 6. **Types (later):** schema inference from history, OpenAPI and JSON Schema import, validation, drift detection, type export.
 
 **Later:** Postman collection import, physical-device capture over Wi-Fi.

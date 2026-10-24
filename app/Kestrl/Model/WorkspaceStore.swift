@@ -487,6 +487,7 @@ final class WorkspaceStore {
     }
 
     func clearLogView() {
+        logsFollowing = true
         logLines = []
         selectedLogSeqs = []
         logAnchor = nil

@@ -65,20 +65,11 @@ struct AutosavingSplit<First: View, Second: View>: NSViewRepresentable {
         context.coordinator.firstHost = firstHost
         context.coordinator.secondHost = secondHost
 
-        split.autosaveName = autosaveName
         let savedKey = "NSSplitView Subview Frames \(autosaveName)"
-        let defaultFraction = defaultFraction
-        let firstPaneWidth = firstPaneWidth
-        DispatchQueue.main.async {
-            // Only a first launch lays out at the default; later launches keep the saved divider.
-            guard UserDefaults.standard.object(forKey: savedKey) == nil else { return }
-            split.layoutSubtreeIfNeeded()
-            let total = split.isVertical ? split.bounds.width : split.bounds.height
-            let proposed = firstPaneWidth?.ideal ?? total * defaultFraction
-            let lowest = firstPaneWidth?.minimum ?? minimumPaneSize
-            let highest = min(firstPaneWidth?.maximum ?? .greatestFiniteMagnitude, total - minimumPaneSize)
-            split.setPosition(min(max(proposed, lowest), highest), ofDividerAt: 0)
-        }
+        context.coordinator.initialFraction = defaultFraction
+        context.coordinator.initialWidth = firstPaneWidth?.ideal
+        context.coordinator.needsInitialPosition = UserDefaults.standard.object(forKey: savedKey) == nil
+        split.autosaveName = autosaveName
         return split
     }
 
@@ -93,6 +84,26 @@ struct AutosavingSplit<First: View, Second: View>: NSViewRepresentable {
         var secondHost: NSHostingView<Second>?
         var firstPaneMinimum = minimumPaneSize
         var firstPaneMaximum = CGFloat.greatestFiniteMagnitude
+        var initialFraction: CGFloat = 0.5
+        var initialWidth: CGFloat?
+        var needsInitialPosition = false
+        private var isPositioning = false
+
+        func splitViewDidResizeSubviews(_ notification: Notification) {
+            guard !isPositioning, let split = notification.object as? NSSplitView,
+                  let first = split.subviews.first, split.subviews.count == 2 else { return }
+            let total = split.isVertical ? split.bounds.width : split.bounds.height
+            guard total >= firstPaneMinimum + minimumPaneSize + split.dividerThickness else { return }
+            let current = split.isVertical ? first.frame.width : first.frame.height
+            let proposed = needsInitialPosition ? (initialWidth ?? total * initialFraction) : current
+            let maximum = min(firstPaneMaximum, total - minimumPaneSize - split.dividerThickness)
+            let position = min(max(proposed, firstPaneMinimum), maximum)
+            needsInitialPosition = false
+            guard abs(position - current) > 0.5 else { return }
+            isPositioning = true
+            defer { isPositioning = false }
+            split.setPosition(position, ofDividerAt: 0)
+        }
 
         func splitView(
             _ splitView: NSSplitView,

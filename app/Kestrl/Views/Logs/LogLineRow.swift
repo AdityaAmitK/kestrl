@@ -41,17 +41,20 @@ struct LogLineRow: View {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 levelChip(json.level)
                 Text(json.message)
-                    .fixedSize(horizontal: !wrapsLines, vertical: false)
+                    .lineLimit(wrapsLines ? nil : 1)
+                    .fixedSize(horizontal: !wrapsLines, vertical: wrapsLines)
                 if !json.fields.isEmpty {
                     Text(json.fields.map { "\($0.key)=\($0.value)" }.joined(separator: " "))
+                        .lineLimit(wrapsLines ? nil : 1)
                         .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: !wrapsLines, vertical: false)
+                        .fixedSize(horizontal: !wrapsLines, vertical: wrapsLines)
                 }
             }
             .frame(maxWidth: wrapsLines ? .infinity : nil, alignment: .leading)
         } else {
             Text(line.text)
-                .fixedSize(horizontal: !wrapsLines, vertical: false)
+                .lineLimit(wrapsLines ? nil : 1)
+                .fixedSize(horizontal: !wrapsLines, vertical: wrapsLines)
                 .frame(maxWidth: wrapsLines ? .infinity : nil, alignment: .leading)
         }
     }
