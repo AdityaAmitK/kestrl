@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/kestrl-core", "crates/kestrl-cli"]
+members = ["crates/kestrl-core", "crates/kestrl-cli", "crates/kestrl-ffi"]
 
 [workspace.package]
 version = "0.1.0"
@@ -25,6 +25,7 @@ directories = "5"
 regex = "1"
 ctrlc = { version = "3.5", features = ["termination"] }
 urlencoding = "2"
+uniffi = "0.32"
 rpassword = "7"
 postgres = { version = "0.19", features = ["with-time-0_3", "with-uuid-1", "with-serde_json-1"] }
 postgres-types = { version = "0.2", features = ["with-serde_json-1"] }
