@@ -1,13 +1,34 @@
 //! Secrets live in the macOS Keychain (service "kestrl"), referenced as
 //! `{{secret:name}}`. Resolved values are tracked so output can be masked.
 
-use crate::Result;
+use crate::{Error, Result};
 
 const SERVICE: &str = "kestrl";
 pub const MASK: &str = "••••••";
 
 pub fn get(name: &str) -> Result<String> {
-    Ok(keyring::Entry::new(SERVICE, name)?.get_password()?)
+    match keyring::Entry::new(SERVICE, name)?.get_password() {
+        Ok(value) => Ok(value),
+        Err(keyring::Error::NoEntry) => Err(Error::SecretNotSet {
+            name: name.to_owned(),
+        }),
+        Err(error) => Err(Error::Keychain(error)),
+    }
+}
+
+pub fn referenced_names(text: &str) -> std::collections::BTreeSet<String> {
+    let mut names = std::collections::BTreeSet::new();
+    let mut rest = text;
+    while let Some(start) = rest.find("{{secret:") {
+        rest = &rest[start + 9..];
+        if let Some(end) = rest.find("}}") {
+            names.insert(rest[..end].to_owned());
+            rest = &rest[end + 2..];
+        } else {
+            break;
+        }
+    }
+    names
 }
 
 pub fn set(name: &str, value: &str) -> Result<()> {

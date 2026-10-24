@@ -130,7 +130,7 @@ allow_writes = ["local"]      # read-only everywhere else
 url = "postgres://{{secret:db_local_user}}:{{secret:db_local_pass}}@localhost:5432/app"
 ```
 
-**Resolution order:** `--var k=v` > environment > workspace config. Profiles apply in this order: those listed in the request file, then `-p` flags, then profiles whose `when` matches. Later values override earlier ones. Secrets resolve last.
+**Resolution order:** `--var k=v` > environment > workspace config. Request-file headers and query params are the base values; profiles override them in this order: those listed in the request file, then `-p` flags, then profiles whose `when` matches. Later values override earlier ones. Secrets resolve last.
 
 ## Retention
 

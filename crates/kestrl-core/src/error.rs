@@ -24,6 +24,10 @@ pub enum Error {
     InvalidRequest(String),
     #[error("unknown variable: {0}")]
     UnknownVariable(String),
+    #[error("environment \"{name}\" not found; available environments: {available}")]
+    EnvironmentNotFound { name: String, available: String },
+    #[error("secret \"{name}\" is not set — run: kestrl secret set {name}")]
+    SecretNotSet { name: String },
     #[error("variable expansion cycle or depth limit at {0}")]
     VariableCycle(String),
     #[error("HTTP request failed: {0}")]

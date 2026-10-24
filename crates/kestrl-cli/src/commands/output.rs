@@ -4,19 +4,23 @@ use std::io::Write;
 
 use kestrl_core::http::Exchange;
 
+pub fn print_json(value: &serde_json::Value) -> anyhow::Result<()> {
+    writeln!(
+        std::io::stdout(),
+        "{}",
+        serde_json::to_string_pretty(value)?
+    )?;
+    Ok(())
+}
+
 pub fn exchange_json(exchange: &Exchange) -> serde_json::Value {
     let body = serde_json::from_str(&exchange.response_body)
         .unwrap_or_else(|_| serde_json::Value::String(exchange.response_body.clone()));
     serde_json::json!({"status": exchange.status, "ms": exchange.duration_ms, "headers": exchange.response_headers, "body": body, "redacted": exchange.redacted, "error": exchange.error})
 }
 
-pub fn print_json(exchange: &Exchange) -> anyhow::Result<()> {
-    writeln!(
-        std::io::stdout(),
-        "{}",
-        serde_json::to_string_pretty(&exchange_json(exchange))?
-    )?;
-    Ok(())
+pub fn print_exchange_json(exchange: &Exchange) -> anyhow::Result<()> {
+    print_json(&exchange_json(exchange))
 }
 
 pub fn print_human(exchange: &Exchange) {

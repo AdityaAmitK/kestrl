@@ -9,7 +9,6 @@ use crate::{Error, Result};
 pub struct Variables {
     pub overrides: BTreeMap<String, String>,
     pub environment: BTreeMap<String, String>,
-    pub process: BTreeMap<String, String>,
     pub workspace: BTreeMap<String, String>,
     pub redactor: Redactor,
 }
@@ -49,7 +48,6 @@ impl Variables {
                     .overrides
                     .get(name)
                     .or_else(|| self.environment.get(name))
-                    .or_else(|| self.process.get(name))
                     .or_else(|| self.workspace.get(name))
                     .ok_or_else(|| Error::UnknownVariable(name.to_owned()))?
                     .clone();

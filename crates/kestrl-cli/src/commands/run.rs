@@ -8,12 +8,14 @@ use crate::context::Context;
 
 #[derive(Debug, Args)]
 pub struct RunArgs {
+    /// Collection directory
     pub dir: std::path::PathBuf,
     #[command(flatten)]
     pub resolve: crate::commands::ResolveArgs,
 }
 
 pub fn run(ctx: &Context, args: RunArgs) -> anyhow::Result<()> {
+    let client = http::client()?;
     let mut paths = std::fs::read_dir(&args.dir)?
         .filter_map(|entry| entry.ok().map(|entry| entry.path()))
         .filter(|path| {
@@ -25,7 +27,12 @@ pub fn run(ctx: &Context, args: RunArgs) -> anyhow::Result<()> {
     paths.sort();
     let mut results = Vec::new();
     for path in paths {
-        let exchange = super::send::send_one(ctx, &[path.display().to_string()], &args.resolve)?;
+        let exchange = super::send::send_one_with_client(
+            ctx,
+            &[path.display().to_string()],
+            &args.resolve,
+            &client,
+        )?;
         if !ctx.is_json {
             writeln!(
                 std::io::stdout(),
@@ -45,16 +52,9 @@ pub fn run(ctx: &Context, args: RunArgs) -> anyhow::Result<()> {
         results.push(exchange);
     }
     if ctx.is_json {
-        writeln!(
-            std::io::stdout(),
-            "{}",
-            serde_json::to_string_pretty(
-                &results
-                    .iter()
-                    .map(super::output::exchange_json)
-                    .collect::<Vec<_>>()
-            )?
-        )?;
+        super::output::print_json(&serde_json::Value::Array(
+            results.iter().map(super::output::exchange_json).collect(),
+        ))?;
     }
     if results.iter().any(|exchange: &http::Exchange| {
         exchange.error.is_some() || exchange.status.is_none_or(|status| status >= 400)

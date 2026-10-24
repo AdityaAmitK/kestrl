@@ -23,7 +23,6 @@ pub fn run(ctx: &Context, args: EnvsArgs) -> anyhow::Result<()> {
         let mut vars = Variables {
             workspace: config.vars,
             environment: env.vars,
-            process: std::env::vars().collect(),
             ..Variables::default()
         };
         let values = vars.environment.clone();

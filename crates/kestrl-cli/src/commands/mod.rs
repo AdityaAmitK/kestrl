@@ -38,10 +38,10 @@ pub enum Command {
 /// Flags shared by commands that resolve variables and profiles.
 #[derive(Debug, Args)]
 pub struct ResolveArgs {
-    /// Environment name (defaults to the workspace default)
+    /// Environment name
     #[arg(long, short)]
     pub env: Option<String>,
-    /// Profile to apply; repeatable
+    /// Profile name
     #[arg(long = "profile", short = 'p')]
     pub profiles: Vec<String>,
     /// Variable override, `key=value`; repeatable

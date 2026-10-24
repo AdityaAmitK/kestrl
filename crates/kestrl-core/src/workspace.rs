@@ -23,6 +23,27 @@ pub fn find_root(from: &Path) -> Result<PathBuf> {
     Err(Error::WorkspaceNotFound(from.to_owned()))
 }
 
+pub(crate) fn names(dir: &Path) -> Result<Vec<String>> {
+    let mut names = std::fs::read_dir(dir)
+        .map_err(|source| Error::Read {
+            path: dir.to_owned(),
+            source,
+        })?
+        .filter_map(|entry| entry.ok().map(|entry| entry.path()))
+        .filter(|path| {
+            path.extension()
+                .is_some_and(|extension| extension == "toml")
+        })
+        .filter_map(|path| {
+            path.file_stem()
+                .and_then(|stem| stem.to_str())
+                .map(str::to_owned)
+        })
+        .collect::<Vec<_>>();
+    names.sort();
+    Ok(names)
+}
+
 impl WorkspaceConfig {
     pub fn load(root: &Path) -> Result<Self> {
         let path = root.join(".kestrl/kestrl.toml");

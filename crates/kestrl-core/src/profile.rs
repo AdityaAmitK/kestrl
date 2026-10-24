@@ -5,7 +5,12 @@ use std::path::Path;
 
 use serde::Deserialize;
 
+use crate::workspace;
 use crate::{Error, Result};
+
+pub fn names(root: &Path) -> Result<Vec<String>> {
+    workspace::names(&root.join(".kestrl/profiles"))
+}
 
 #[derive(Debug, Default, Deserialize)]
 pub struct Profile {

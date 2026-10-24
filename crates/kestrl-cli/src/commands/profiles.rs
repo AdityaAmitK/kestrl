@@ -29,19 +29,7 @@ pub fn run(ctx: &Context, args: ProfilesArgs) -> anyhow::Result<()> {
             write!(std::io::stdout(), "{}", std::fs::read_to_string(path)?)?;
         }
     } else {
-        let mut names = std::fs::read_dir(&dir)?
-            .filter_map(|entry| entry.ok().map(|entry| entry.path()))
-            .filter(|path| {
-                path.extension()
-                    .is_some_and(|extension| extension == "toml")
-            })
-            .filter_map(|path| {
-                path.file_stem()
-                    .and_then(|stem| stem.to_str())
-                    .map(str::to_owned)
-            })
-            .collect::<Vec<_>>();
-        names.sort();
+        let names = profile::names(&root)?;
         if ctx.is_json {
             writeln!(
                 std::io::stdout(),

@@ -8,6 +8,8 @@ use serde::Serialize;
 use crate::Result;
 use crate::request::ResolvedRequest;
 
+pub type Client = reqwest::blocking::Client;
+
 #[derive(Debug, Serialize)]
 pub struct Exchange {
     pub method: String,
@@ -22,8 +24,13 @@ pub struct Exchange {
     pub redacted: Vec<String>,
 }
 
-pub fn send(request: ResolvedRequest) -> Result<Exchange> {
-    let client = reqwest::blocking::Client::new();
+pub fn client() -> Result<reqwest::blocking::Client> {
+    Ok(reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()?)
+}
+
+pub fn send(client: &reqwest::blocking::Client, request: ResolvedRequest) -> Result<Exchange> {
     let method = reqwest::Method::from_bytes(request.method.as_bytes())
         .map_err(|_| crate::Error::InvalidMethod(request.method.clone()))?;
     let mut builder = client.request(method, &request.url).query(&request.query);
@@ -33,6 +40,13 @@ pub fn send(request: ResolvedRequest) -> Result<Exchange> {
     if let Some(body) = &request.body {
         builder = builder.body(body.clone());
     }
+    let final_url = builder
+        .try_clone()
+        .ok_or_else(|| crate::Error::InvalidRequest("request body cannot be cloned".to_owned()))?
+        .build()?
+        .url()
+        .as_str()
+        .to_owned();
     let started = Instant::now();
     let result = builder.send();
     let duration_ms = started.elapsed().as_millis();
@@ -68,7 +82,7 @@ pub fn send(request: ResolvedRequest) -> Result<Exchange> {
     let redact = |value: &str| request.redactor.redact(value);
     Ok(Exchange {
         method: redact(&request.method),
-        url: redact(&request.url),
+        url: redact(&final_url),
         request_headers: request
             .headers
             .into_iter()

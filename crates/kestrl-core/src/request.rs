@@ -1,7 +1,7 @@
 //! Request files and resolved HTTP request construction.
 
 use std::collections::BTreeMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use serde::Deserialize;
 
@@ -81,8 +81,8 @@ pub fn resolve(
     }
     let url = resolved_vars.resolve(&request.url)?;
     let profile_url = url.clone();
-    let mut headers = BTreeMap::new();
-    let mut query = BTreeMap::new();
+    let mut headers = request.headers.clone();
+    let mut query = request.query.clone();
     let names = request
         .profiles
         .iter()
@@ -117,12 +117,6 @@ pub fn resolve(
     automatic.sort_by(|a, b| a.0.cmp(&b.0));
     for (_, item) in automatic {
         merge_profile(&mut headers, &mut query, item);
-    }
-    for (key, value) in request.headers {
-        headers.insert(key, value);
-    }
-    for (key, value) in request.query {
-        query.insert(key, value);
     }
     headers = headers
         .into_iter()
@@ -172,8 +166,4 @@ fn merge_profile(
     for (key, value) in item.query {
         query.insert(key, value);
     }
-}
-
-pub fn workspace_path() -> Result<PathBuf> {
-    crate::workspace::find_root(&std::env::current_dir()?)
 }
