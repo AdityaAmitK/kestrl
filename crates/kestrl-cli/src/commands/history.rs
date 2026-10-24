@@ -1,11 +1,22 @@
 //! `kestrl history`: search, show and edit history events.
 
+use std::collections::BTreeMap;
 use std::io::{self, Write};
+use std::path::PathBuf;
 
-use anyhow::{Context as _, bail};
+use anyhow::{Context as _, anyhow, bail};
 use clap::{Args, Subcommand};
-use kestrl_core::history::{EventDetail, EventSummary, History, HistoryFilter, now_ms};
+use kestrl_core::duration::parse_since;
+use kestrl_core::history::{
+    BodyDiff, EventDetail, EventDiff, EventSummary, History, HistoryFilter, LineOp, now_ms,
+};
+use kestrl_core::http;
+use kestrl_core::request::ResolvedRequest;
+use kestrl_core::secrets::Redactor;
+use kestrl_core::workspace::WorkspaceConfig;
 
+use super::ResolveArgs;
+use super::send::{self, Sent};
 use crate::context::Context;
 
 #[derive(Debug, Args)]
@@ -21,7 +32,7 @@ pub struct HistoryArgs {
     /// Only events with this tag
     #[arg(long)]
     pub tag: Option<String>,
-    /// Only events from the last 30m, 1h or 2d
+    /// Only events from the last 30s, 2m, 1h or 2d
     #[arg(long)]
     pub since: Option<String>,
     /// Only events in this session
@@ -50,6 +61,18 @@ pub enum HistoryAction {
         #[arg(long)]
         note: Option<String>,
     },
+    /// Send a past request again, as it was stored
+    Replay {
+        /// Event id or unique prefix
+        id: String,
+    },
+    /// Compare two HTTP events: status, duration, headers and body
+    Diff {
+        /// Event id or unique prefix
+        a: String,
+        /// Event id or unique prefix
+        b: String,
+    },
 }
 
 pub fn run(ctx: &Context, args: HistoryArgs) -> anyhow::Result<()> {
@@ -61,6 +84,11 @@ pub fn run(ctx: &Context, args: HistoryArgs) -> anyhow::Result<()> {
             set_actor,
             note,
         }) => edit(&history, id, set_actor.as_deref(), note.as_deref()),
+        Some(HistoryAction::Replay { id }) => {
+            let sent = replay(ctx, &history, id)?;
+            send::print_sent(ctx, &sent)
+        }
+        Some(HistoryAction::Diff { a, b }) => diff(ctx, &history, a, b),
         None => list(ctx, &history, args),
     }
 }
@@ -70,7 +98,7 @@ fn list(ctx: &Context, history: &History, args: HistoryArgs) -> anyhow::Result<(
         text: args.query,
         actor: args.by,
         tag: args.tag,
-        since_ms: args.since.as_deref().map(since_ms).transpose()?,
+        since_ms: args.since.as_deref().map(parse_since).transpose()?,
         session_id: args.session,
         limit: args.limit,
     };
@@ -120,13 +148,137 @@ fn edit(
     Ok(())
 }
 
+/// Send the stored request again. Secrets are never stored, so when the event
+/// has redactions the request is re-resolved from its request file instead.
+fn replay(ctx: &Context, history: &History, id: &str) -> anyhow::Result<Sent> {
+    let detail = history.show(id)?;
+    let original = detail.event.id.clone();
+    let stored = detail
+        .http
+        .ok_or_else(|| anyhow!("{original} is not an HTTP event"))?;
+    let client = http::client()?;
+    if stored.redacted.is_empty() {
+        let request = ResolvedRequest {
+            method: stored.method,
+            url: stored.url,
+            headers: stored.req_headers.into_iter().collect(),
+            query: BTreeMap::new(),
+            body: stored.req_body,
+            redactor: Redactor::default(),
+        };
+        let exchange = http::send(&client, request)?;
+        let root = send::workspace_root()?;
+        let config = WorkspaceConfig::load(&root)?;
+        let meta = send::event_meta(ctx, &root, detail.event.env, detail.request_ref);
+        let event_id = send::record(&exchange, meta, &config.retention, Some(&original));
+        Ok(Sent { exchange, event_id })
+    } else {
+        let request_ref = detail.request_ref.ok_or_else(|| {
+            anyhow!(
+                "cannot replay {original}: it used secrets ({}) and has no request file to re-resolve",
+                stored.redacted.join(", ")
+            )
+        })?;
+        let path = PathBuf::from(detail.workspace.unwrap_or_default()).join(request_ref);
+        let resolve = ResolveArgs {
+            env: detail.event.env,
+            profiles: Vec::new(),
+            vars: Vec::new(),
+        };
+        send::send_one_with_client(
+            ctx,
+            &[path.display().to_string()],
+            &resolve,
+            &client,
+            Some(&original),
+        )
+    }
+}
+
+fn diff(ctx: &Context, history: &History, a: &str, b: &str) -> anyhow::Result<()> {
+    let left = history.show(a)?;
+    let right = history.show(b)?;
+    let (Some(left_http), Some(right_http)) = (&left.http, &right.http) else {
+        bail!("history diff compares two HTTP events");
+    };
+    let diff = kestrl_core::history::diff_exchanges(left_http, right_http);
+    let mut out = io::stdout().lock();
+    if ctx.is_json {
+        writeln!(out, "{}", serde_json::to_string_pretty(&diff)?)?;
+    } else {
+        write_diff(&mut out, &diff)?;
+    }
+    Ok(())
+}
+
+fn write_diff(out: &mut impl Write, diff: &EventDiff) -> io::Result<()> {
+    writeln!(
+        out,
+        "status:    {} → {}",
+        status_text(diff.status.0),
+        status_text(diff.status.1)
+    )?;
+    writeln!(
+        out,
+        "duration:  {}ms → {}ms",
+        diff.duration_ms.0, diff.duration_ms.1
+    )?;
+    if diff.headers.is_empty() {
+        writeln!(out, "headers:   no changes")?;
+    } else {
+        writeln!(out, "headers:")?;
+        for (name, value) in &diff.headers.added {
+            writeln!(out, "  + {name}: {value}")?;
+        }
+        for (name, value) in &diff.headers.removed {
+            writeln!(out, "  - {name}: {value}")?;
+        }
+        for change in &diff.headers.changed {
+            writeln!(out, "  ~ {}: {} → {}", change.name, change.from, change.to)?;
+        }
+    }
+    match &diff.body {
+        BodyDiff::Identical => writeln!(out, "body:      identical")?,
+        BodyDiff::Json { changes } => {
+            writeln!(out, "body (json):")?;
+            for change in changes {
+                writeln!(
+                    out,
+                    "  {}: {} → {}",
+                    change.path,
+                    value_text(change.from.as_ref()),
+                    value_text(change.to.as_ref())
+                )?;
+            }
+        }
+        BodyDiff::Lines { ops } => {
+            writeln!(out, "body (text):")?;
+            for op in ops {
+                match op {
+                    LineOp::Added { text } => writeln!(out, "  + {text}")?,
+                    LineOp::Removed { text } => writeln!(out, "  - {text}")?,
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn status_text(status: Option<u16>) -> String {
+    status.map_or_else(|| "-".to_owned(), |status| status.to_string())
+}
+
+fn value_text(value: Option<&serde_json::Value>) -> String {
+    value.map_or_else(|| "(missing)".to_owned(), serde_json::Value::to_string)
+}
+
 fn write_row(out: &mut impl Write, event: &EventSummary, now: i64) -> io::Result<()> {
     let tags: Vec<String> = event.tags.iter().map(|tag| format!("#{tag}")).collect();
     writeln!(
         out,
         "{}  {:>4}  {:<12}  {}  {}",
         event.id,
-        age(now - event.ts),
+        crate::commands::output::age(now - event.ts),
         event.actor,
         event.summary,
         tags.join(" ")
@@ -136,7 +288,11 @@ fn write_row(out: &mut impl Write, event: &EventSummary, now: i64) -> io::Result
 fn write_detail(out: &mut impl Write, detail: &EventDetail) -> io::Result<()> {
     let event = &detail.event;
     writeln!(out, "{}  {}", event.id, event.summary)?;
-    writeln!(out, "when:      {} ago", age(now_ms() - event.ts))?;
+    writeln!(
+        out,
+        "when:      {} ago",
+        crate::commands::output::age(now_ms() - event.ts)
+    )?;
     writeln!(out, "actor:     {}", event.actor)?;
     writeln!(out, "source:    {}", event.source)?;
     for (label, value) in [
@@ -179,32 +335,4 @@ fn write_detail(out: &mut impl Write, detail: &EventDetail) -> io::Result<()> {
         }
     }
     Ok(())
-}
-
-/// Unix ms at the start of a window such as `30m`, `1h` or `2d`.
-fn since_ms(spec: &str) -> anyhow::Result<i64> {
-    let (count, unit_ms) = if let Some(count) = spec.strip_suffix('m') {
-        (count, 60_000)
-    } else if let Some(count) = spec.strip_suffix('h') {
-        (count, 3_600_000)
-    } else if let Some(count) = spec.strip_suffix('d') {
-        (count, 86_400_000)
-    } else {
-        bail!("--since must end in m, h or d, e.g. 1h");
-    };
-    let count: i64 = count
-        .parse()
-        .with_context(|| format!("invalid --since {spec:?}"))?;
-    Ok(now_ms().saturating_sub(count.saturating_mul(unit_ms)))
-}
-
-/// Compact age such as `5s`, `12m`, `3h` or `2d`.
-fn age(ms: i64) -> String {
-    let secs = ms.max(0) / 1000;
-    match secs {
-        0..60 => format!("{secs}s"),
-        60..3600 => format!("{}m", secs / 60),
-        3600..86400 => format!("{}h", secs / 3600),
-        _ => format!("{}d", secs / 86400),
-    }
 }

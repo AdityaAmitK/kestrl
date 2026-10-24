@@ -1,11 +1,10 @@
 //! HTTPS interception proxy lifecycle.
 
-use std::collections::HashMap;
 use std::collections::HashSet;
 use std::io::Read;
-use std::net::SocketAddr;
+use std::net::{Ipv4Addr, SocketAddr};
 use std::sync::{Arc, Mutex};
-use std::time::{Instant, SystemTime, UNIX_EPOCH};
+use std::time::Instant;
 
 use http_body_util::BodyExt;
 use hudsucker::certificate_authority::RcgenAuthority;
@@ -15,6 +14,7 @@ use hudsucker::rustls::crypto::aws_lc_rs;
 use hudsucker::{Body, HttpContext, HttpHandler, Proxy, RequestOrResponse};
 
 use super::CapturedExchange;
+use crate::history::now_ms;
 use crate::{Error, Result};
 
 const MAX_CAPTURE_BODY_BYTES: usize = 1024 * 1024;
@@ -22,7 +22,7 @@ const MAX_CAPTURE_BODY_BYTES: usize = 1024 * 1024;
 /// Options for starting the capture proxy.
 #[derive(Clone)]
 pub struct ProxyOptions {
-    /// TCP port to bind on all interfaces.
+    /// TCP port to bind on loopback.
     pub port: u16,
     /// Optional host glob filters.
     pub hosts: Vec<String>,
@@ -33,11 +33,12 @@ pub struct ProxyOptions {
 #[derive(Clone)]
 struct CaptureHandler {
     callback: Arc<dyn Fn(CapturedExchange) + Send + Sync>,
-    pending: Arc<Mutex<HashMap<SocketAddr, PendingExchange>>>,
+    pending: Option<PendingExchange>,
     hosts: Vec<String>,
     tunneled_hosts: Arc<Mutex<HashSet<String>>>,
 }
 
+#[derive(Clone)]
 struct PendingExchange {
     method: String,
     url: String,
@@ -50,7 +51,7 @@ struct PendingExchange {
 impl HttpHandler for CaptureHandler {
     async fn handle_request(
         &mut self,
-        ctx: &HttpContext,
+        _ctx: &HttpContext,
         request: Request<Body>,
     ) -> RequestOrResponse {
         let (parts, body) = request.into_parts();
@@ -95,21 +96,17 @@ impl HttpHandler for CaptureHandler {
                     .and_then(|value| value.to_str().ok()),
             ),
             started: Instant::now(),
-            ts: SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .map_or(0, |elapsed| {
-                    i64::try_from(elapsed.as_millis()).unwrap_or(i64::MAX)
-                }),
+            ts: now_ms(),
         };
-        if let Ok(mut exchanges) = self.pending.lock() {
-            exchanges.insert(ctx.client_addr, pending);
-        }
+        // hudsucker creates an InternalProxy and clones its handler inside each request's
+        // service_fn call; the same instance handles this request and its response.
+        self.pending = Some(pending);
         Request::from_parts(parts, Body::from(bytes)).into()
     }
 
     async fn handle_response(
         &mut self,
-        ctx: &HttpContext,
+        _ctx: &HttpContext,
         response: Response<Body>,
     ) -> Response<Body> {
         let (parts, body) = response.into_parts();
@@ -118,9 +115,7 @@ impl HttpHandler for CaptureHandler {
             .await
             .map(|collected| collected.to_bytes())
             .unwrap_or_default();
-        if let Ok(mut exchanges) = self.pending.lock()
-            && let Some(pending) = exchanges.remove(&ctx.client_addr)
-        {
+        if let Some(pending) = self.pending.take() {
             (self.callback)(CapturedExchange {
                 method: pending.method,
                 url: pending.url,
@@ -174,11 +169,7 @@ impl HttpHandler for CaptureHandler {
                 res_headers: Vec::new(),
                 res_body: None,
                 duration_ms: 0,
-                ts: SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .map_or(0, |elapsed| {
-                        i64::try_from(elapsed.as_millis()).unwrap_or(i64::MAX)
-                    }),
+                ts: now_ms(),
                 tunneled: true,
             });
         }
@@ -224,7 +215,7 @@ pub fn run(options: ProxyOptions) -> Result<()> {
     let authority = RcgenAuthority::new(issuer, 1_000, aws_lc_rs::default_provider());
     let handler = CaptureHandler {
         callback: options.callback,
-        pending: Arc::new(Mutex::new(HashMap::new())),
+        pending: None,
         hosts: options.hosts,
         tunneled_hosts: Arc::new(Mutex::new(HashSet::new())),
     };
@@ -243,7 +234,7 @@ pub fn run(options: ProxyOptions) -> Result<()> {
             }
         };
         Proxy::builder()
-            .with_addr(SocketAddr::from(([0, 0, 0, 0], options.port)))
+            .with_addr(SocketAddr::from((Ipv4Addr::LOCALHOST, options.port)))
             .with_ca(authority)
             .with_rustls_connector(aws_lc_rs::default_provider())
             .with_http_handler(handler)

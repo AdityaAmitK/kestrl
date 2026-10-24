@@ -3,7 +3,6 @@
 use std::io::IsTerminal;
 use std::io::Read;
 use std::io::Write;
-use std::path::Path;
 
 use clap::{Args, Subcommand};
 use kestrl_core::{secrets, workspace};
@@ -46,12 +45,7 @@ pub fn run(ctx: &Context, args: SecretArgs) -> anyhow::Result<()> {
         SecretAction::Rm { name } => secrets::delete(&name)?,
         SecretAction::Ls => {
             let root = workspace::find_root(&std::env::current_dir()?)?;
-            let mut found = std::collections::BTreeSet::new();
-            let kestrl_dir = root.join(".kestrl");
-            if kestrl_dir.is_dir() {
-                scan(&kestrl_dir, true, &mut found)?;
-            }
-            scan(&root, false, &mut found)?;
+            let found = secrets::workspace_references(&root)?;
             if ctx.is_json {
                 let values = found
                     .iter()
@@ -87,34 +81,4 @@ fn is_set(name: &str) -> anyhow::Result<bool> {
 
 fn read_hidden() -> anyhow::Result<String> {
     Ok(rpassword::prompt_password("Secret: ")?)
-}
-
-fn scan(
-    dir: &Path,
-    is_kestrl: bool,
-    found: &mut std::collections::BTreeSet<String>,
-) -> anyhow::Result<()> {
-    for entry in std::fs::read_dir(dir)? {
-        let path = entry?.path();
-        if path.is_dir() {
-            let name = path
-                .file_name()
-                .and_then(|name| name.to_str())
-                .unwrap_or_default();
-            if name == "target" || name == "node_modules" || name == ".git" || name.starts_with('.')
-            {
-                continue;
-            }
-            scan(&path, is_kestrl || name == ".kestrl", found)?;
-        } else if (is_kestrl
-            || path
-                .file_name()
-                .and_then(|name| name.to_str())
-                .is_some_and(|name| name.ends_with(".req.toml")))
-            && let Ok(content) = std::fs::read_to_string(&path)
-        {
-            found.extend(secrets::referenced_names(&content));
-        }
-    }
-    Ok(())
 }

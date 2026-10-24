@@ -2,14 +2,14 @@
 
 use rusqlite::params;
 
-use super::{History, RetentionOptions, now_ms};
+use super::{EventMeta, History, RetentionOptions, now_ms};
 use crate::Result;
 
 /// One captured exchange to save in history.
 #[derive(Debug, Clone)]
 pub struct NewCapture {
-    /// Capture source (`simulator` or `android`).
-    pub source: String,
+    /// History metadata shared with sent HTTP exchanges.
+    pub meta: EventMeta,
     /// HTTP method.
     pub method: String,
     /// Full request URL.
@@ -30,7 +30,11 @@ pub struct NewCapture {
 
 impl History {
     /// Store a captured exchange as one capture event.
-    pub fn record_capture(&mut self, capture: &NewCapture, actor: &str) -> Result<String> {
+    pub fn record_capture(
+        &mut self,
+        capture: &NewCapture,
+        retention: &RetentionOptions,
+    ) -> Result<String> {
         let id = ulid::Ulid::new().to_string();
         let ts = now_ms();
         let summary = format!(
@@ -43,8 +47,8 @@ impl History {
         let res_headers = serde_json::to_string(&capture.res_headers)?;
         let tx = self.conn.transaction()?;
         tx.execute(
-            "INSERT INTO events (id, ts, kind, source, actor, summary) VALUES (?1, ?2, 'capture', ?3, ?4, ?5)",
-            params![id, ts, capture.source, actor, summary],
+            "INSERT INTO events (id, ts, kind, source, actor, session_id, workspace, env, request_ref, correlation, summary) VALUES (?1, ?2, 'capture', ?3, ?4, ?5, ?6, ?7, ?8, NULL, ?9)",
+            params![id, ts, capture.meta.source, capture.meta.actor, capture.meta.session_id, capture.meta.workspace, capture.meta.env, capture.meta.request_ref, summary],
         )?;
         tx.execute(
             "INSERT INTO http_exchanges (event_id, method, url, req_headers, req_body, status, res_headers, res_body, duration_ms, redacted)
@@ -56,7 +60,7 @@ impl History {
             params![id, summary, capture.url, capture.req_body, capture.res_body],
         )?;
         tx.commit()?;
-        self.prune(&RetentionOptions::default())?;
+        self.prune(retention)?;
         Ok(id)
     }
 }

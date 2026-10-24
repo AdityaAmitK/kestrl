@@ -1,16 +1,16 @@
 //! Device capture commands.
 
 use std::io::Write;
-use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 use anyhow::Context as _;
 use clap::{Args, Subcommand};
 use kestrl_core::capture::proxy::ProxyOptions;
 use kestrl_core::capture::{self, CapturedExchange};
-use kestrl_core::history::{History, NewCapture};
-use kestrl_core::secrets::{self, MASK, Redactor};
+use kestrl_core::history::{EventMeta, History, NewCapture};
+use kestrl_core::workspace::{self, WorkspaceConfig};
 
+use crate::commands::output;
 use crate::context::Context;
 
 /// Device capture subcommands.
@@ -47,6 +47,9 @@ pub fn run(ctx: &Context, args: CaptureArgs) -> anyhow::Result<()> {
         DeviceCommand::Sim(options) => ("simulator", options, true),
         DeviceCommand::Android(options) => ("android", options, false),
     };
+    let cwd = std::env::current_dir()?;
+    let root = workspace::find_root(&cwd)?;
+    let workspace_config = WorkspaceConfig::load(&root)?;
     let paths = capture::ca::ensure().context("create Kestrl root CA")?;
     capture::system_proxy::restore().context("restore stale system proxy state")?;
     let history = if options.save {
@@ -56,31 +59,56 @@ pub fn run(ctx: &Context, args: CaptureArgs) -> anyhow::Result<()> {
     };
     if simulator {
         capture::system_proxy::enable(options.port).context("enable macOS system proxy")?;
-        eprintln!("Install the Kestrl root certificate with `kestrl proxy trust --sim`.");
     } else {
         capture::device::start_android(options.port).context("configure Android emulator proxy")?;
+    }
+    let proxy_guard = if simulator {
+        Some(capture::system_proxy::SystemProxyGuard::new())
+    } else {
+        None
+    };
+    if simulator {
+        eprintln!("Install the Kestrl root certificate with `kestrl proxy trust --sim`.");
+    } else {
         eprintln!("Install the Kestrl root certificate with `kestrl proxy trust --android`.");
     }
+    let redactor = Arc::new(kestrl_core::secrets::workspace_redactor(&root)?);
     let actor = ctx.actor.as_str().to_owned();
     let json = ctx.is_json;
-    let redactor = Arc::new(capture_redactor());
+    let offset = ctx.utc_offset;
+    let root_string = root.to_string_lossy().into_owned();
+    let retention = workspace_config.retention;
     let callback = Arc::new(move |exchange: CapturedExchange| {
-        let exchange = redact_exchange(exchange, &redactor);
-        if let Some(history) = &history
-            && let Ok(mut history) = history.lock()
-        {
-            let capture = NewCapture {
-                source: source.to_owned(),
-                method: exchange.method.clone(),
-                url: exchange.url.clone(),
-                req_headers: exchange.req_headers.clone(),
-                req_body: exchange.req_body.clone(),
-                status: exchange.status,
-                res_headers: exchange.res_headers.clone(),
-                res_body: exchange.res_body.clone(),
-                duration_ms: exchange.duration_ms,
-            };
-            let _ = history.record_capture(&capture, &actor);
+        let exchange = capture::redact(exchange, &redactor);
+        if let Some(history) = &history {
+            let result = (|| -> kestrl_core::Result<String> {
+                let mut history = history
+                    .lock()
+                    .map_err(|_| kestrl_core::Error::Capture("history lock poisoned".to_owned()))?;
+                let session_id = history.current_session()?.map(|session| session.id);
+                let capture = NewCapture {
+                    meta: EventMeta {
+                        source: source.to_owned(),
+                        actor: actor.clone(),
+                        session_id,
+                        workspace: Some(root_string.clone()),
+                        env: workspace_config.default_env.clone(),
+                        request_ref: None,
+                    },
+                    method: exchange.method.clone(),
+                    url: exchange.url.clone(),
+                    req_headers: exchange.req_headers.clone(),
+                    req_body: exchange.req_body.clone(),
+                    status: exchange.status,
+                    res_headers: exchange.res_headers.clone(),
+                    res_body: exchange.res_body.clone(),
+                    duration_ms: exchange.duration_ms,
+                };
+                history.record_capture(&capture, &retention)
+            })();
+            if let Err(error) = result {
+                output::warn(&format!("capture event not recorded: {error}"));
+            }
         }
         if json {
             if let Ok(line) =
@@ -93,21 +121,28 @@ pub fn run(ctx: &Context, args: CaptureArgs) -> anyhow::Result<()> {
                 .url
                 .split_once("://")
                 .map_or(exchange.url.as_str(), |(_, rest)| rest);
+            let status = if exchange.tunneled {
+                "-".to_owned()
+            } else {
+                exchange
+                    .status
+                    .map_or_else(|| "-".to_owned(), |value| value.to_string())
+            };
+            let tunnel = if exchange.tunneled { "  tunneled" } else { "" };
             let _ = writeln!(
                 std::io::stdout().lock(),
-                "{:02}:{:02}:{:02}  {} {}  {}ms  {}",
-                (exchange.ts / 3_600_000) % 24,
-                (exchange.ts / 60_000) % 60,
-                (exchange.ts / 1_000) % 60,
+                "{}  {} {}  {}ms  {}{}",
+                output::clock(exchange.ts, offset),
                 exchange.method,
-                exchange.status.unwrap_or_default(),
+                status,
                 exchange.duration_ms,
-                path
+                path,
+                tunnel
             );
         }
     });
     eprintln!(
-        "Kestrl capture proxy listening on 0.0.0.0:{} (CA: {})",
+        "Kestrl capture proxy listening on 127.0.0.1:{} (CA: {})",
         options.port,
         paths.certificate.display()
     );
@@ -116,6 +151,7 @@ pub fn run(ctx: &Context, args: CaptureArgs) -> anyhow::Result<()> {
         hosts: options.host,
         callback,
     });
+    drop(proxy_guard);
     let cleanup = if simulator {
         capture::system_proxy::restore()
     } else {
@@ -124,68 +160,4 @@ pub fn run(ctx: &Context, args: CaptureArgs) -> anyhow::Result<()> {
     result.context("run capture proxy")?;
     cleanup.context("restore device proxy settings")?;
     Ok(())
-}
-
-fn capture_redactor() -> Redactor {
-    let mut redactor = Redactor::default();
-    let current = std::env::current_dir().unwrap_or_default();
-    let mut names = std::collections::BTreeSet::new();
-    for directory in [current.join(".kestrl"), current.join("requests")] {
-        collect_secret_names(&directory, &mut names);
-    }
-    for name in names {
-        if let Ok(value) = secrets::get(&name) {
-            redactor.track(&name, &value);
-        }
-    }
-    redactor
-}
-
-fn collect_secret_names(path: &Path, names: &mut std::collections::BTreeSet<String>) {
-    let Ok(entries) = std::fs::read_dir(path) else {
-        return;
-    };
-    for entry in entries.flatten() {
-        let entry_path = entry.path();
-        if entry_path.is_dir() {
-            collect_secret_names(&entry_path, names);
-        } else if entry_path
-            .extension()
-            .is_some_and(|extension| extension == "toml")
-            && let Ok(contents) = std::fs::read_to_string(entry_path)
-        {
-            names.extend(secrets::referenced_names(&contents));
-        }
-    }
-}
-
-fn redact_exchange(mut exchange: CapturedExchange, redactor: &Redactor) -> CapturedExchange {
-    exchange.method = redactor.redact(&exchange.method);
-    exchange.url = redactor.redact(&exchange.url);
-    for (name, value) in &mut exchange.req_headers {
-        if is_sensitive_header(name) {
-            *value = MASK.to_owned();
-        } else {
-            *value = redactor.redact(value);
-        }
-        *name = redactor.redact(name);
-    }
-    for (name, value) in &mut exchange.res_headers {
-        if is_sensitive_header(name) {
-            *value = MASK.to_owned();
-        } else {
-            *value = redactor.redact(value);
-        }
-        *name = redactor.redact(name);
-    }
-    exchange.req_body = exchange.req_body.map(|body| redactor.redact(&body));
-    exchange.res_body = exchange.res_body.map(|body| redactor.redact(&body));
-    exchange
-}
-
-fn is_sensitive_header(name: &str) -> bool {
-    matches!(
-        name.to_ascii_lowercase().as_str(),
-        "authorization" | "proxy-authorization" | "cookie" | "set-cookie"
-    )
 }

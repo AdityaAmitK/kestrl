@@ -1,6 +1,8 @@
 //! Creation and storage of the Kestrl root certificate authority.
 
 use std::fs;
+use std::fs::OpenOptions;
+use std::io::Write;
 use std::path::PathBuf;
 
 use directories::ProjectDirs;
@@ -58,11 +60,21 @@ pub fn ensure() -> Result<CertificateAuthorityFiles> {
         .self_signed(&key)
         .map_err(|error| Error::Capture(error.to_string()))?;
     fs::write(&paths.certificate, certificate.pem())?;
-    fs::write(&paths.private_key, key.serialize_pem())?;
     #[cfg(unix)]
     {
-        use std::os::unix::fs::PermissionsExt;
-        fs::set_permissions(&paths.private_key, fs::Permissions::from_mode(0o600))?;
+        use std::os::unix::fs::OpenOptionsExt;
+        OpenOptions::new()
+            .create_new(true)
+            .write(true)
+            .mode(0o600)
+            .open(&paths.private_key)?
+            .write_all(key.serialize_pem().as_bytes())?;
     }
+    #[cfg(not(unix))]
+    OpenOptions::new()
+        .create_new(true)
+        .write(true)
+        .open(&paths.private_key)?
+        .write_all(key.serialize_pem().as_bytes())?;
     Ok(paths)
 }

@@ -142,7 +142,7 @@ url = "postgres://{{secret:db_local_user}}:{{secret:db_local_pass}}@localhost:54
 | Saved events (tagged or noted) | Until deleted |
 | Bodies | Cut to 1 MB when stored |
 
-All limits are configurable in `.kestrl/kestrl.toml` under `[retention]`.
+All limits are configurable in `.kestrl/kestrl.toml` under `[retention]`: `max_age_days`, `max_events`, `max_body_bytes`.
 
 ## History schema
 
@@ -169,7 +169,7 @@ kestrl secret set|rm|ls [name]             # `set` reads the value from stdin or
 
 # History
 kestrl history [query] [--by actor] [--tag t] [--since 1h] [--session id] [--limit n]
-kestrl history show|replay <id>
+kestrl history show|replay <id>            # replay re-resolves from the request file if secrets were masked
 kestrl history diff <a> <b>
 kestrl history edit <id> [--set-actor a] [--note text]
 kestrl tag <id> <tag> [--remove]
@@ -182,8 +182,9 @@ kestrl logs <service> [-f] [--since 2m] [--grep re] [--json]
 kestrl logs attach <service> --file <path> | --docker <container>
 
 # Database
-kestrl db query <connection> "<sql>" [-e env] [--json]
-kestrl db tables <connection> [-e env]
+kestrl db query <connection> "<sql>" [-e env]
+kestrl db tables <connection> [-e env] [table]
+kestrl db connections
 
 # Capture
 kestrl capture sim|android|browser [--save]
@@ -193,6 +194,8 @@ kestrl proxy ca                             # show the root certificate path and
 kestrl proxy restore                       # restore saved macOS proxy settings
 ```
 
+The global `--json` option applies to database commands as well.
+
 `send` JSON output: `{ id, status, ms, headers, body, redacted: ["local_token"] }`
 
 ## Phases
@@ -200,7 +203,7 @@ kestrl proxy restore                       # restore saved macOS proxy settings
 1. **Requests and history:** variables, environments, Keychain secrets and masking, profiles, `send`, `run`, history store and retention, `history`, `tag`, `session`.
 2. **Services and logs:** `up`, `ps`, `logs` (tail, grep, follow), `attach`. In-memory buffers, with port detection per service.
 3. **Database:** Postgres connections per environment, read-only by default, `db query` and `db tables`. Queries recorded in history.
-4. **Capture:** an HTTPS interception proxy with its own root certificate, device capture (iOS Simulator, Android emulator), browser capture (CDP), and port capture (plain HTTP on loopback). The system proxy must be restored on exit, and again on the next start after a crash. The current device capture commands are `kestrl capture sim|android [--port] [--save] [--host]`.
+4. **Capture:** an HTTPS interception proxy with its own root certificate, device capture (iOS Simulator, Android emulator), browser capture (CDP), and port capture (plain HTTP on loopback). The interception proxy binds to loopback only. The system proxy must be restored on exit, and again on the next start after a crash; restore retries retain state until every saved service is restored. The current device capture commands are `kestrl capture sim|android [--port] [--save] [--host]`.
 5. **GUI:** `kestrl-ffi` and the SwiftUI app: request editor, environment picker, history and timeline, log viewer, DB console, live capture, Copy JSON everywhere.
 6. **Types (later):** schema inference from history, OpenAPI and JSON Schema import, validation, drift detection, type export.
 
