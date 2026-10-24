@@ -1,5 +1,6 @@
 //! Device capture through a local HTTPS interception proxy.
 
+pub mod browser;
 pub mod ca;
 pub mod device;
 pub mod proxy;

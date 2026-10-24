@@ -25,6 +25,24 @@ enum DeviceCommand {
     Sim(CaptureOptions),
     /// Capture traffic from a booted Android emulator
     Android(CaptureOptions),
+    /// Capture traffic from a separate browser window
+    Browser(BrowserOptions),
+}
+
+#[derive(Debug, Args)]
+struct BrowserOptions {
+    /// Chromium browser to launch
+    #[arg(long, value_parser = ["chrome", "arc", "brave", "edge", "chromium"])]
+    browser: Option<String>,
+    /// Initial URL
+    #[arg(long)]
+    url: Option<String>,
+    /// Save each captured exchange to history
+    #[arg(long)]
+    save: bool,
+    /// Limit captured hosts
+    #[arg(long)]
+    host: Vec<String>,
 }
 
 #[derive(Debug, Args)]
@@ -42,9 +60,16 @@ struct CaptureOptions {
 
 /// Start device capture and stream each completed exchange.
 pub fn run(ctx: &Context, args: CaptureArgs) -> anyhow::Result<()> {
-    let (source, options, simulator) = match args.command {
+    let command = match args.command {
+        DeviceCommand::Browser(options) => return run_browser(ctx, options),
+        command => command,
+    };
+    let (source, options, simulator) = match command {
         DeviceCommand::Sim(options) => ("simulator", options, true),
         DeviceCommand::Android(options) => ("android", options, false),
+        DeviceCommand::Browser(_) => {
+            return Err(anyhow::anyhow!("browser command dispatch failed"));
+        }
     };
     let cwd = std::env::current_dir()?;
     let root = workspace::find_root(&cwd).ok();
@@ -129,28 +154,7 @@ pub fn run(ctx: &Context, args: CaptureArgs) -> anyhow::Result<()> {
                 let _ = writeln!(std::io::stdout().lock(), "{line}");
             }
         } else {
-            let path = exchange
-                .url
-                .split_once("://")
-                .map_or(exchange.url.as_str(), |(_, rest)| rest);
-            let status = if exchange.tunneled {
-                "-".to_owned()
-            } else {
-                exchange
-                    .status
-                    .map_or_else(|| "-".to_owned(), |value| value.to_string())
-            };
-            let tunnel = if exchange.tunneled { "  tunneled" } else { "" };
-            let _ = writeln!(
-                std::io::stdout().lock(),
-                "{}  {} {}  {}ms  {}{}",
-                output::clock(exchange.ts, offset),
-                exchange.method,
-                status,
-                exchange.duration_ms,
-                path,
-                tunnel
-            );
+            output::print_capture_line(&exchange, offset);
         }
     });
     capture::session::run(capture::session::SessionOptions {
@@ -159,5 +163,97 @@ pub fn run(ctx: &Context, args: CaptureArgs) -> anyhow::Result<()> {
         callback,
         simulator,
     })?;
+    Ok(())
+}
+
+fn run_browser(ctx: &Context, options: BrowserOptions) -> anyhow::Result<()> {
+    let cwd = std::env::current_dir()?;
+    let root = workspace::find_root(&cwd).ok();
+    let config = root
+        .as_ref()
+        .map(|root| WorkspaceConfig::load(root))
+        .transpose()?;
+    let history = if options.save {
+        Some(Mutex::new(History::open_default()?))
+    } else {
+        None
+    };
+    let redactor = Arc::new(match &root {
+        Some(root) => kestrl_core::secrets::workspace_redactor(root)?,
+        None => kestrl_core::secrets::Redactor::default(),
+    });
+    let actor = ctx.actor.as_str().to_owned();
+    let json = ctx.force_json;
+    let offset = ctx.utc_offset;
+    let root_string = root
+        .as_ref()
+        .map(|path| path.to_string_lossy().into_owned());
+    let retention = config.as_ref().map(|config| config.retention);
+    let callback = Arc::new(move |exchange: CapturedExchange| {
+        let exchange = capture::redact(exchange, &redactor);
+        if let Some(history) = &history {
+            let result = (|| -> kestrl_core::Result<String> {
+                let mut history = history
+                    .lock()
+                    .map_err(|_| kestrl_core::Error::Capture("history lock poisoned".to_owned()))?;
+                let session_id = history.current_session()?.map(|session| session.id);
+                let saved = NewCapture {
+                    meta: EventMeta {
+                        source: "browser".to_owned(),
+                        actor: actor.clone(),
+                        session_id,
+                        workspace: root_string.clone(),
+                        env: config
+                            .as_ref()
+                            .and_then(|config| config.default_env.clone()),
+                        request_ref: None,
+                    },
+                    method: exchange.method.clone(),
+                    url: exchange.url.clone(),
+                    req_headers: exchange.req_headers.clone(),
+                    req_body: exchange.req_body.clone(),
+                    status: exchange.status,
+                    res_headers: exchange.res_headers.clone(),
+                    res_body: exchange.res_body.clone(),
+                    duration_ms: exchange.duration_ms,
+                };
+                if let Some(retention) = &retention {
+                    history.record_capture(&saved, retention)
+                } else {
+                    history.record_capture(&saved, &Default::default())
+                }
+            })();
+            if let Err(error) = result {
+                output::warn(&format!("capture event not recorded: {error}"));
+            }
+        }
+        if json {
+            if let Ok(line) =
+                serde_json::to_string(&serde_json::json!({"ts":exchange.ts,"exchange":exchange}))
+            {
+                let _ = writeln!(std::io::stdout().lock(), "{line}");
+            }
+        } else {
+            output::print_capture_line(&exchange, offset);
+        }
+    });
+    let browser = options.browser.as_deref().map(|name| match name {
+        "chrome" => kestrl_core::capture::browser::Browser::Chrome,
+        "arc" => kestrl_core::capture::browser::Browser::Arc,
+        "brave" => kestrl_core::capture::browser::Browser::Brave,
+        "edge" => kestrl_core::capture::browser::Browser::Edge,
+        _ => kestrl_core::capture::browser::Browser::Chromium,
+    });
+    let profile =
+        kestrl_core::capture::browser::run(kestrl_core::capture::browser::BrowserOptions {
+            browser,
+            url: options.url,
+            hosts: options.host,
+            callback,
+        })?;
+    eprintln!(
+        "Browser capture used isolated profile: {}",
+        profile.display()
+    );
     Ok(())
 }

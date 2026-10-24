@@ -202,6 +202,7 @@ kestrl db connections
 
 # Capture
 kestrl capture sim|android|browser [--save]
+kestrl capture browser [--browser chrome|arc|brave|edge|chromium] [--url <start-url>] [--save] [--host <glob>]
 kestrl capture port <port> [--save]
 kestrl proxy trust --sim|--android          # install or stage the Kestrl root certificate
 kestrl proxy ca                             # show the root certificate path and fingerprint
@@ -217,7 +218,7 @@ The global `--json` option applies to database commands as well.
 1. **Requests and history:** variables, environments, Keychain secrets and masking, profiles, `send`, `run`, history store and retention, `history`, `tag`, `session`.
 2. **Services and logs:** `up`, `ps`, `logs` (tail, grep, follow), `attach`. In-memory buffers, with port detection per service.
 3. **Database:** Postgres connections per environment, read-only by default, `db query` and `db tables`. Queries recorded in history.
-4. **Capture:** an HTTPS interception proxy with its own root certificate, device capture (iOS Simulator, Android emulator), browser capture (CDP), and port capture (plain HTTP on loopback). The interception proxy binds to loopback only. The system proxy must be restored on exit, and again on the next start after a crash; restore retries retain state until every saved service is restored. The current device capture commands are `kestrl capture sim|android [--port] [--save] [--host]`.
+4. **Capture:** an HTTPS interception proxy with its own root certificate, device capture (iOS Simulator, Android emulator), browser capture (CDP), and port capture (plain HTTP on loopback). The interception proxy binds to loopback only. The system proxy must be restored on exit, and again on the next start after a crash; restore retries retain state until every saved service is restored. Device capture commands are `kestrl capture sim|android [--port] [--save] [--host]`; browser capture launches a separate Chromium-family browser with an isolated temporary profile.
 5. **GUI:** `kestrl-ffi` and the SwiftUI app: request editor, environment picker, history and timeline, log viewer, DB console, live capture, Copy JSON everywhere.
 6. **Types (later):** schema inference from history, OpenAPI and JSON Schema import, validation, drift detection, type export.
 

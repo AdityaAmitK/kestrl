@@ -176,7 +176,7 @@ impl HttpHandler for CaptureHandler {
     }
 }
 
-fn host_matches(pattern: &str, host: &str) -> bool {
+pub(crate) fn host_matches(pattern: &str, host: &str) -> bool {
     if pattern == "*" {
         return true;
     }
