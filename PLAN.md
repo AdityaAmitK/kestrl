@@ -79,8 +79,9 @@ app/              SwiftUI macOS app; links kestrl-ffi as an XCFramework
 
 | Area | Functions |
 |---|---|
-| Workspace | `open_workspace(path) -> WorkspaceInfo` (root, default env, envs, profiles, request files) |
+| Workspace | `open_workspace(path) -> WorkspaceInfo` (root, default env, envs, profiles, requests with method and name, retention settings) |
 | Requests | `send_request_file(root, path, env, profiles, vars)`, `send_ad_hoc(root, method, url, env)` → `SentExchange`; recorded as actor `me`, source `app` |
+| Requests | `read_request_file(root, path)` → `RequestDetail`, the file as written, variables unresolved |
 | History | `list_events(filter)`, `show_event(id)`, `tag_event`, `untag_event`, `set_note`, `diff_events(a, b)` → JSON string |
 | Environments | `resolved_env(root, env)` → `[KeyValue]`, secrets masked |
 | Secrets | `set_secret(name, value)`, `delete_secret(name)`, `secret_status(root)` |
