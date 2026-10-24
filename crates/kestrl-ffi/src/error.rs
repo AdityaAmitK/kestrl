@@ -34,10 +34,8 @@ impl From<kestrl_core::Error> for KestrlError {
             | Error::VariableCycle(_)
             | Error::EnvironmentNotFound { .. }
             | Error::Http(_)
-            | Error::Database(_)
             | Error::ServiceNotRunning { .. }
-            | Error::ServiceAlreadyRunning { .. }
-            | Error::Capture(_) => Self::Request { message },
+            | Error::ServiceAlreadyRunning { .. } => Self::Request { message },
             Error::SecretNotSet { .. } | Error::Keychain(_) => Self::Secret { message },
             Error::InvalidMethod(_)
             | Error::InvalidDuration(_)
@@ -47,6 +45,7 @@ impl From<kestrl_core::Error> for KestrlError {
             | Error::ReadOnlyConnection { .. }
             | Error::InvalidServiceName { .. }
             | Error::InvalidGrep { .. } => Self::InvalidInput { message },
+            Error::Capture(_) | Error::Database(_) => Self::Request { message },
             Error::Sqlite(_)
             | Error::Json(_)
             | Error::EventNotFound(_)

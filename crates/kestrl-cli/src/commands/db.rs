@@ -2,12 +2,8 @@
 
 use std::io::{self, Write};
 
-use anyhow::Context as _;
 use clap::{Args, Subcommand};
-use kestrl_core::db::{ConnectionConfig, ConnectionInfo, QueryOptions, QueryResult};
-use kestrl_core::history::{EventMeta, History, NewDbEvent, RetentionOptions};
-use kestrl_core::secrets::Redactor;
-use kestrl_core::workspace::{self, WorkspaceConfig};
+use kestrl_core::db::{ConnectionConfig, QueryResult};
 
 use crate::context::Context;
 
@@ -47,7 +43,7 @@ pub enum DbCommand {
 pub fn run(ctx: &Context, args: DbArgs) -> anyhow::Result<()> {
     match args.command {
         DbCommand::Connections => {
-            let root = find_workspace()?;
+            let root = kestrl_core::workspace::find_current()?;
             let names = ConnectionConfig::names(&root)?;
             if ctx.is_json {
                 writeln!(
@@ -82,41 +78,21 @@ fn query_command(
     sql: &str,
     env: Option<&str>,
 ) -> anyhow::Result<()> {
-    let (root, info, redactor, retention) = resolve(connection, env)?;
-    let started = std::time::Instant::now();
-    let result = kestrl_core::db::query(
-        &info,
+    let root = kestrl_core::workspace::find_current()?;
+    let run = kestrl_core::db::run_query(
+        &root,
+        connection,
+        env,
         sql,
-        QueryOptions {
-            is_read_only: info.is_read_only,
-        },
-        &redactor,
-    );
-    let elapsed = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
-    let mut event = NewDbEvent {
-        meta: EventMeta {
+        kestrl_core::db::DbQueryMeta {
             source: "cli".to_owned(),
             actor: ctx.actor.as_str().to_owned(),
-            session_id: None,
-            workspace: Some(root.to_string_lossy().into_owned()),
-            env: Some(info.env.clone()),
-            request_ref: None,
         },
-        connection: info.name.clone(),
-        sql: redactor.redact(sql),
-        rows: result.as_ref().ok().map(|result| result.row_count),
-        duration_ms: elapsed,
-        error: result
-            .as_ref()
-            .err()
-            .map(|error| redactor.redact(&error.to_string())),
-    };
-    let history_result = record(&mut event, &retention);
-    if let Err(error) = history_result {
+    )?;
+    if let Some(error) = run.history_warning {
         crate::commands::output::warn(&format!("could not record database query: {error}"));
     }
-    let mut result = result?;
-    redact_result(&mut result, &redactor);
+    let result = run.outcome?;
     if ctx.is_json {
         let output = serde_json::json!({
             "columns": result.columns,
@@ -141,10 +117,9 @@ fn tables_command(
     env: Option<&str>,
     table: Option<&str>,
 ) -> anyhow::Result<()> {
-    let (_, info, redactor, _) = resolve(connection, env)?;
+    let root = kestrl_core::workspace::find_current()?;
     if let Some(table) = table {
-        let (schema, name) = table.split_once('.').unwrap_or(("public", table));
-        let columns = kestrl_core::db::describe_table(&info, schema, name, &redactor)?;
+        let columns = kestrl_core::db::run::describe(&root, connection, env, table)?;
         if ctx.is_json {
             writeln!(
                 io::stdout().lock(),
@@ -168,7 +143,7 @@ fn tables_command(
             }
         }
     } else {
-        let tables = kestrl_core::db::list_tables(&info, &redactor)?;
+        let tables = kestrl_core::db::run::tables(&root, connection, env)?;
         if ctx.is_json {
             writeln!(
                 io::stdout().lock(),
@@ -188,35 +163,6 @@ fn tables_command(
         }
     }
     Ok(())
-}
-
-fn resolve(
-    connection: &str,
-    env: Option<&str>,
-) -> anyhow::Result<(
-    std::path::PathBuf,
-    ConnectionInfo,
-    Redactor,
-    RetentionOptions,
-)> {
-    let root = find_workspace()?;
-    let workspace_config = WorkspaceConfig::load(&root)?;
-    let (env, mut variables) = workspace::load_variables(&root, env)?;
-    let config = ConnectionConfig::load(&root, connection)?;
-    let info = config.resolve(connection, &env, &mut variables)?;
-    let retention = workspace_config.retention;
-    Ok((root, info, variables.redactor, retention))
-}
-
-fn find_workspace() -> anyhow::Result<std::path::PathBuf> {
-    let cwd = std::env::current_dir()?;
-    workspace::find_root(&cwd).context("could not find a Kestrl workspace")
-}
-
-fn record(event: &mut NewDbEvent, retention: &RetentionOptions) -> kestrl_core::Result<String> {
-    let mut history = History::open_default()?;
-    event.meta.session_id = history.current_session()?.map(|session| session.id);
-    history.record_db(event, retention)
 }
 
 fn print_table(result: &QueryResult) -> anyhow::Result<()> {
@@ -292,14 +238,4 @@ fn truncate(value: &str, max: usize) -> String {
         .collect::<String>();
     result.push('…');
     result
-}
-
-fn redact_result(result: &mut QueryResult, redactor: &Redactor) {
-    for row in &mut result.rows {
-        for value in row {
-            if let serde_json::Value::String(text) = value {
-                *text = redactor.redact(text);
-            }
-        }
-    }
 }
