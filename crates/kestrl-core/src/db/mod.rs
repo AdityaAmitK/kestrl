@@ -1,6 +1,7 @@
 //! PostgreSQL connections, queries and table browsing.
 
 mod connection;
+mod numeric;
 mod postgres;
 mod tables;
 

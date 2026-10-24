@@ -3,6 +3,7 @@
 //! `record` writes events, `query` reads them, `edit` changes saved ones,
 //! `retention` prunes unsaved ones and `session` groups events.
 
+mod diff;
 mod edit;
 mod query;
 mod record;
@@ -18,8 +19,9 @@ use rusqlite::Connection;
 
 use crate::{Error, Result};
 
+pub use diff::{BodyDiff, EventDiff, HeaderChange, HeaderDiff, JsonChange, LineOp, diff_exchanges};
 pub use query::{EventDetail, EventSummary, HistoryFilter, HttpExchange};
-pub use record::NewHttpEvent;
+pub use record::{EventMeta, NewHttpEvent};
 pub use record_db::NewDbEvent;
 pub use retention::RetentionOptions;
 pub use session::Session;
@@ -32,17 +34,6 @@ pub struct History {
 }
 
 impl History {
-    pub fn record_db(&mut self, event: &NewDbEvent) -> Result<String> {
-        record_db::record_db(self, event)
-    }
-    pub(crate) fn transaction(&mut self) -> Result<rusqlite::Transaction<'_>> {
-        Ok(self.conn.transaction()?)
-    }
-
-    pub(crate) fn prune_default(&mut self) -> Result<()> {
-        self.prune(&RetentionOptions::default()).map(|_| ())
-    }
-
     pub fn open(path: &Path) -> Result<Self> {
         if let Some(dir) = path.parent() {
             std::fs::create_dir_all(dir)?;

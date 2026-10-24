@@ -3,6 +3,7 @@
 
 pub mod actor;
 pub mod db;
+pub mod duration;
 pub mod env;
 pub mod error;
 pub mod history;

@@ -5,9 +5,19 @@ use serde::{Deserialize, Serialize};
 
 use super::{History, RetentionOptions, now_ms};
 use crate::Result;
+use crate::http::Exchange;
 
-/// Bodies are cut to this many bytes before storage.
-const MAX_BODY_BYTES: usize = 1024 * 1024;
+/// Who and where an exchange happened. `session_id` is filled in when recording.
+#[derive(Debug, Clone, Default)]
+pub struct EventMeta {
+    pub source: String,
+    pub actor: String,
+    pub session_id: Option<String>,
+    pub workspace: Option<String>,
+    pub env: Option<String>,
+    /// Request file path relative to the workspace root; `None` for ad-hoc sends
+    pub request_ref: Option<String>,
+}
 
 /// One HTTP exchange to record. Values must already be redacted.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -31,14 +41,57 @@ pub struct NewHttpEvent {
     pub redacted: Vec<String>,
 }
 
+impl NewHttpEvent {
+    /// Map a sent exchange (already redacted) to an event.
+    pub fn from_exchange(exchange: &Exchange, meta: EventMeta) -> Self {
+        Self {
+            source: meta.source,
+            actor: meta.actor,
+            session_id: meta.session_id,
+            workspace: meta.workspace,
+            env: meta.env,
+            request_ref: meta.request_ref,
+            correlation: None,
+            method: exchange.method.clone(),
+            url: exchange.url.clone(),
+            req_headers: exchange
+                .request_headers
+                .iter()
+                .map(|(name, value)| (name.clone(), value.clone()))
+                .collect(),
+            req_body: exchange.request_body.clone(),
+            status: exchange.status,
+            res_headers: exchange
+                .response_headers
+                .iter()
+                .map(|(name, value)| (name.clone(), value.clone()))
+                .collect(),
+            res_body: (!exchange.response_body.is_empty()).then(|| exchange.response_body.clone()),
+            duration_ms: u64::try_from(exchange.duration_ms).unwrap_or(u64::MAX),
+            error: exchange.error.clone(),
+            redacted: exchange.redacted.clone(),
+        }
+    }
+}
+
 impl History {
     /// Store an HTTP exchange as one event, then prune old history.
-    pub fn record_http(&mut self, event: &NewHttpEvent) -> Result<String> {
+    pub fn record_http(
+        &mut self,
+        event: &NewHttpEvent,
+        retention: &RetentionOptions,
+    ) -> Result<String> {
         let id = ulid::Ulid::new().to_string();
         let ts = now_ms();
         let summary = summarize(event);
-        let req_body = event.req_body.as_deref().map(cut_body);
-        let res_body = event.res_body.as_deref().map(cut_body);
+        let req_body = event
+            .req_body
+            .as_deref()
+            .map(|body| cut_body(body, retention.max_body_bytes));
+        let res_body = event
+            .res_body
+            .as_deref()
+            .map(|body| cut_body(body, retention.max_body_bytes));
         let req_headers = serde_json::to_string(&event.req_headers)?;
         let res_headers = serde_json::to_string(&event.res_headers)?;
         let redacted = serde_json::to_string(&event.redacted)?;
@@ -83,7 +136,7 @@ impl History {
         )?;
         tx.commit()?;
 
-        self.prune(&RetentionOptions::default())?;
+        self.prune(retention)?;
         Ok(id)
     }
 }
@@ -108,11 +161,11 @@ fn path_of(url: &str) -> &str {
     path.split_once('?').map_or(path, |(path, _)| path)
 }
 
-fn cut_body(body: &str) -> &str {
-    if body.len() <= MAX_BODY_BYTES {
+fn cut_body(body: &str, max_bytes: usize) -> &str {
+    if body.len() <= max_bytes {
         return body;
     }
-    let mut end = MAX_BODY_BYTES;
+    let mut end = max_bytes;
     while !body.is_char_boundary(end) {
         end -= 1;
     }
