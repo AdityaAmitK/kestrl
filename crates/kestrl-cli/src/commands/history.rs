@@ -1,11 +1,10 @@
 //! `kestrl history`: search, show and edit history events.
 
 use std::io::{self, Write};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context as _, bail};
 use clap::{Args, Subcommand};
-use kestrl_core::history::{EventDetail, EventSummary, History, HistoryFilter};
+use kestrl_core::history::{EventDetail, EventSummary, History, HistoryFilter, now_ms};
 
 use crate::context::Context;
 
@@ -16,9 +15,9 @@ pub struct HistoryArgs {
     pub action: Option<HistoryAction>,
     /// Full-text search query
     pub query: Option<String>,
-    /// Only events by this actor
-    #[arg(long)]
-    pub actor: Option<String>,
+    /// Only events by this actor (me, cursor, claude-code, codex, ...)
+    #[arg(long = "by", value_name = "ACTOR")]
+    pub by: Option<String>,
     /// Only events with this tag
     #[arg(long)]
     pub tag: Option<String>,
@@ -45,8 +44,8 @@ pub enum HistoryAction {
         /// Event id or unique prefix
         id: String,
         /// New actor, e.g. claude-code
-        #[arg(long)]
-        actor: Option<String>,
+        #[arg(long = "set-actor", value_name = "ACTOR")]
+        set_actor: Option<String>,
         /// New note; makes the event saved
         #[arg(long)]
         note: Option<String>,
@@ -57,9 +56,11 @@ pub fn run(ctx: &Context, args: HistoryArgs) -> anyhow::Result<()> {
     let history = History::open_default().context("failed to open history")?;
     match args.action.as_ref() {
         Some(HistoryAction::Show { id }) => show(ctx, &history, id),
-        Some(HistoryAction::Edit { id, actor, note }) => {
-            edit(&history, id, actor.as_deref(), note.as_deref())
-        }
+        Some(HistoryAction::Edit {
+            id,
+            set_actor,
+            note,
+        }) => edit(&history, id, set_actor.as_deref(), note.as_deref()),
         None => list(ctx, &history, args),
     }
 }
@@ -67,7 +68,7 @@ pub fn run(ctx: &Context, args: HistoryArgs) -> anyhow::Result<()> {
 fn list(ctx: &Context, history: &History, args: HistoryArgs) -> anyhow::Result<()> {
     let filter = HistoryFilter {
         text: args.query,
-        actor: args.actor,
+        actor: args.by,
         tag: args.tag,
         since_ms: args.since.as_deref().map(since_ms).transpose()?,
         session_id: args.session,
@@ -107,7 +108,7 @@ fn edit(
     note: Option<&str>,
 ) -> anyhow::Result<()> {
     if actor.is_none() && note.is_none() {
-        bail!("nothing to edit; pass --actor or --note");
+        bail!("nothing to edit; pass --set-actor or --note");
     }
     if let Some(actor) = actor {
         history.set_actor(id, actor)?;
@@ -206,10 +207,4 @@ fn age(ms: i64) -> String {
         3600..86400 => format!("{}h", secs / 3600),
         _ => format!("{}d", secs / 86400),
     }
-}
-
-fn now_ms() -> i64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_or(0, |d| i64::try_from(d.as_millis()).unwrap_or(i64::MAX))
 }
