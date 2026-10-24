@@ -1,7 +1,10 @@
 //! `kestrl session`: start or end a session.
 
-use clap::Args;
-use clap::Subcommand;
+use std::io::{self, Write};
+
+use anyhow::Context as _;
+use clap::{Args, Subcommand};
+use kestrl_core::history::History;
 
 use crate::context::Context;
 
@@ -19,6 +22,21 @@ pub enum SessionAction {
     End,
 }
 
-pub fn run(_ctx: &Context, _args: SessionArgs) -> anyhow::Result<()> {
-    anyhow::bail!("`kestrl session` is not implemented yet")
+pub fn run(ctx: &Context, args: SessionArgs) -> anyhow::Result<()> {
+    let history = History::open_default().context("failed to open history")?;
+    match args.action {
+        SessionAction::Start { name } => {
+            let id = history.start_session(name.as_deref(), ctx.actor.as_str())?;
+            writeln!(io::stdout(), "Started session {id}")?;
+        }
+        SessionAction::End => {
+            let session = history.end_session()?;
+            writeln!(
+                io::stdout(),
+                "Ended session {}",
+                session.name.as_deref().unwrap_or(&session.id)
+            )?;
+        }
+    }
+    Ok(())
 }

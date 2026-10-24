@@ -1,0 +1,4 @@
+default_env = "local"
+
+[vars]
+api_url = "https://httpbin.org"

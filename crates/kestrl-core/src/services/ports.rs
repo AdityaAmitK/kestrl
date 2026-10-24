@@ -1,29 +1,32 @@
 //! TCP listening port discovery for a process tree.
+
 use std::process::Command;
+
+/// Return listening TCP ports owned by a process and its descendants.
 pub fn listening(pid: u32) -> Vec<u16> {
-    let mut pids = vec![pid];
-    let mut i = 0;
-    while i < pids.len() {
-        if let Ok(o) = Command::new("pgrep")
-            .args(["-P", &pids[i].to_string()])
+    let mut process_ids = vec![pid];
+    let mut index = 0;
+    while index < process_ids.len() {
+        if let Ok(output) = Command::new("pgrep")
+            .args(["-P", &process_ids[index].to_string()])
             .output()
         {
-            pids.extend(
-                String::from_utf8_lossy(&o.stdout)
+            process_ids.extend(
+                String::from_utf8_lossy(&output.stdout)
                     .lines()
-                    .filter_map(|x| x.parse::<u32>().ok()),
+                    .filter_map(|process_id| process_id.parse::<u32>().ok()),
             );
         }
-        i += 1;
+        index += 1;
     }
-    let Ok(o) = Command::new("lsof")
+    let Ok(output) = Command::new("lsof")
         .args([
             "-nP",
             "-a",
             "-iTCP",
             "-sTCP:LISTEN",
             "-p",
-            &pids
+            &process_ids
                 .iter()
                 .map(u32::to_string)
                 .collect::<Vec<_>>()
@@ -33,7 +36,7 @@ pub fn listening(pid: u32) -> Vec<u16> {
     else {
         return vec![];
     };
-    let mut ports = String::from_utf8_lossy(&o.stdout)
+    let mut ports = String::from_utf8_lossy(&output.stdout)
         .lines()
         .skip(1)
         .filter_map(|line| line.split_whitespace().nth(8))

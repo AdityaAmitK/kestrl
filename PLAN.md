@@ -130,7 +130,7 @@ allow_writes = ["local"]      # read-only everywhere else
 url = "postgres://{{secret:db_local_user}}:{{secret:db_local_pass}}@localhost:5432/app"
 ```
 
-**Resolution order:** `--var k=v` > environment > workspace config. Profiles apply in this order: those listed in the request file, then `-p` flags, then profiles whose `when` matches. Later values override earlier ones. Secrets resolve last.
+**Resolution order:** `--var k=v` > environment > workspace config. Request-file headers and query params are the base values; profiles override them in this order: those listed in the request file, then `-p` flags, then profiles whose `when` matches. Later values override earlier ones. Secrets resolve last.
 
 ## Retention
 
@@ -168,11 +168,11 @@ kestrl profiles [name]
 kestrl secret set|rm|ls [name]             # `set` reads the value from stdin or a prompt
 
 # History
-kestrl history [query] [--actor a] [--tag t] [--since 1h] [--session id] [--limit n]
+kestrl history [query] [--by actor] [--tag t] [--since 1h] [--session id] [--limit n]
 kestrl history show|replay <id>
 kestrl history diff <a> <b>
-kestrl history edit <id> [--actor a] [--note text]
-kestrl tag <id> <tag>
+kestrl history edit <id> [--set-actor a] [--note text]
+kestrl tag <id> <tag> [--remove]
 kestrl session start [name] | end
 
 # Services and logs

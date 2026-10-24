@@ -1,12 +1,27 @@
-//! Tail or follow a service's live buffer.
-use clap::{Args, Subcommand};
+//! Tail or follow a service's live buffer, or attach an external log source.
+
+use std::io;
+use std::io::Write;
+use std::path::PathBuf;
+
+use anyhow::Context as _;
+use anyhow::bail;
+use clap::ArgGroup;
+use clap::Args;
+use clap::Subcommand;
+use kestrl_core::history::now_ms;
+use kestrl_core::services::buffer::{LogLine, Stream};
+use kestrl_core::services::client::{self, Query};
+
+use crate::context::Context;
+
+/// Arguments for `kestrl logs`.
 #[derive(Debug, Args)]
 pub struct LogsArgs {
-    /// Attach to a file or Docker container
+    /// Attach to an external log source
     #[command(subcommand)]
     pub action: Option<LogsAction>,
     /// Service name to tail
-    #[arg()]
     pub service: Option<String>,
     /// Follow new log lines
     #[arg(short, long)]
@@ -17,96 +32,141 @@ pub struct LogsArgs {
     /// Filter log text with a regular expression
     #[arg(long)]
     pub grep: Option<String>,
-    /// Maximum number of lines to return
+    /// Show the last n matching lines
     #[arg(long)]
     pub limit: Option<usize>,
 }
+
 #[derive(Debug, Subcommand)]
 pub enum LogsAction {
     /// Attach to a log file or Docker container
     Attach(AttachArgs),
 }
+
+/// Arguments for `kestrl logs attach`.
 #[derive(Debug, Args)]
+#[command(group(ArgGroup::new("source").required(true).multiple(false).args(["file", "docker"])))]
 pub struct AttachArgs {
     /// Service name
     pub service: String,
     /// Follow a log file
-    #[arg(long, conflicts_with = "docker", required_unless_present = "docker")]
-    pub file: Option<String>,
+    #[arg(long)]
+    pub file: Option<PathBuf>,
     /// Follow Docker container logs
-    #[arg(long, required_unless_present = "file")]
+    #[arg(long)]
     pub docker: Option<String>,
 }
-#[allow(clippy::print_stdout)]
-pub fn run(ctx: &crate::context::Context, a: LogsArgs) -> anyhow::Result<()> {
-    if let Some(LogsAction::Attach(x)) = a.action {
-        let cmd = if let Some(f) = x.file {
-            vec!["tail".into(), "-F".into(), f]
-        } else {
-            vec![
+
+enum AttachSource {
+    File(PathBuf),
+    Docker(String),
+}
+
+impl TryFrom<AttachArgs> for (String, AttachSource) {
+    type Error = anyhow::Error;
+
+    fn try_from(args: AttachArgs) -> Result<Self, Self::Error> {
+        let source = match (args.file, args.docker) {
+            (Some(path), None) => AttachSource::File(path),
+            (None, Some(container)) => AttachSource::Docker(container),
+            _ => bail!("choose exactly one of --file or --docker"),
+        };
+        Ok((args.service, source))
+    }
+}
+
+/// Tail a service's live buffer or attach to an external log source.
+pub fn run(context: &Context, args: LogsArgs) -> anyhow::Result<()> {
+    if let Some(LogsAction::Attach(arguments)) = args.action {
+        let (service, source) = arguments.try_into()?;
+        let command = match source {
+            AttachSource::File(path) => vec![
+                "tail".into(),
+                "-F".into(),
+                path.into_os_string()
+                    .into_string()
+                    .map_err(|_| anyhow::anyhow!("log file path is not valid UTF-8"))?,
+            ],
+            AttachSource::Docker(container) => vec![
                 "docker".into(),
                 "logs".into(),
                 "-f".into(),
                 "--timestamps=false".into(),
-                x.docker.unwrap_or_default(),
-            ]
+                container,
+            ],
         };
-        kestrl_core::services::supervisor::run(&x.service, &cmd)?;
+        kestrl_core::services::supervisor::run(&service, &command)?;
         return Ok(());
     }
-    let s = a
+
+    let service = args
         .service
         .ok_or_else(|| anyhow::anyhow!("service required"))?;
-    let since = a
+    if let Some(pattern) = args.grep.as_ref() {
+        regex::Regex::new(pattern).map_err(|source| kestrl_core::Error::InvalidGrep {
+            pattern: pattern.clone(),
+            source,
+        })?;
+    }
+    let since_ms = args
         .since
         .as_deref()
-        .map(|x| {
-            let (n, u) = x.split_at(x.find(|c: char| !c.is_ascii_digit()).unwrap_or(x.len()));
-            let amount = n.parse::<u128>()?;
-            let multiplier = match u {
-                "s" => 1000,
-                "m" => 60_000,
-                "h" => 3_600_000,
-                _ => anyhow::bail!("invalid duration '{x}'; use a number followed by s, m, or h"),
-            };
-            amount
-                .checked_mul(multiplier)
-                .ok_or_else(|| anyhow::anyhow!("duration is too large"))
-        })
+        .map(parse_since)
         .transpose()?
-        .map(|milliseconds| {
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_millis()
-                .saturating_sub(milliseconds)
-        });
-    let q = kestrl_core::services::client::Query {
-        since_ms: since,
-        grep: a.grep,
-        follow: a.follow,
-        limit: a.limit,
+        .map(|duration_ms| now_ms().saturating_sub(duration_ms));
+    let query = Query {
+        since_ms,
+        grep: args.grep,
+        follow: args.follow,
+        limit: args.limit,
     };
-    kestrl_core::services::client::read(&s, &q, |l| {
-        if ctx.is_json {
-            println!("{}", serde_json::to_string(&l).unwrap_or_default())
-        } else {
-            let seconds = l.ts_ms / 1000;
-            let millis = l.ts_ms % 1000;
-            let clock = format!(
-                "{:02}:{:02}:{:02}.{:03}",
-                (seconds / 3600) % 24,
-                (seconds / 60) % 60,
-                seconds % 60,
-                millis
-            );
-            if l.stream == "stderr" {
-                println!("{clock} [stderr] {}", l.text)
-            } else {
-                println!("{clock}  {}", l.text)
-            }
-        }
-        true
-    })?;
+
+    let mut stdout = io::stdout().lock();
+    client::read(&service, &query, |line| {
+        write_log_line(&mut stdout, context.is_json, &line).map(|()| true)
+    })
+    .context("failed to read service logs")?;
     Ok(())
+}
+
+fn write_log_line(stdout: &mut impl Write, is_json: bool, line: &LogLine) -> io::Result<()> {
+    if is_json {
+        writeln!(stdout, "{}", serde_json::to_string(line)?)
+    } else {
+        let timestamp = line.ts_ms;
+        let seconds = timestamp / 1000;
+        let milliseconds = timestamp % 1000;
+        let clock = format!(
+            "{:02}:{:02}:{:02}.{:03}",
+            (seconds / 3600) % 24,
+            (seconds / 60) % 60,
+            seconds % 60,
+            milliseconds
+        );
+        match line.stream {
+            Stream::Stderr => writeln!(stdout, "{clock} [stderr] {}", line.text),
+            Stream::Stdout => writeln!(stdout, "{clock}  {}", line.text),
+        }
+    }
+}
+
+/// Parse a duration such as `30s`, `2m`, `1h` or `3d` into milliseconds.
+fn parse_since(spec: &str) -> anyhow::Result<i64> {
+    let (amount, unit) = spec.split_at(
+        spec.find(|character: char| !character.is_ascii_digit())
+            .unwrap_or(spec.len()),
+    );
+    let amount = amount
+        .parse::<i64>()
+        .with_context(|| format!("invalid --since duration {spec:?}"))?;
+    let multiplier = match unit {
+        "s" => 1_000,
+        "m" => 60_000,
+        "h" => 3_600_000,
+        "d" => 86_400_000,
+        _ => bail!("invalid duration {spec:?}; use a number followed by s, m, h or d"),
+    };
+    amount
+        .checked_mul(multiplier)
+        .ok_or_else(|| anyhow::anyhow!("duration is too large"))
 }

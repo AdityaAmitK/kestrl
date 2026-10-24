@@ -5,6 +5,7 @@ use std::path::Path;
 
 use serde::Deserialize;
 
+use crate::workspace;
 use crate::{Error, Result};
 
 #[derive(Debug, Default, Deserialize)]
@@ -21,5 +22,9 @@ impl Environment {
             source,
         })?;
         toml::from_str(&text).map_err(|source| Error::Toml { path, source })
+    }
+
+    pub fn names(workspace: &Path) -> Result<Vec<String>> {
+        workspace::names(&workspace.join(".kestrl/envs"))
     }
 }

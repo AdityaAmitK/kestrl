@@ -3,21 +3,27 @@
 //! This supervisor is the one place in core allowed to write a child's output
 //! through to the terminal; core otherwise never prints.
 
-use super::{
-    buffer::Buffer,
-    ports,
-    registry::{self, Service},
-    server,
-};
-use std::{
-    io::{BufRead, BufReader, Read},
-    process::{Command, Stdio},
-    sync::{
-        Arc, Condvar, Mutex,
-        atomic::{AtomicBool, Ordering},
-    },
-    time::{Duration, SystemTime, UNIX_EPOCH},
-};
+use std::io::BufRead;
+use std::io::BufReader;
+use std::io::Read;
+use std::os::unix::net::UnixStream;
+use std::process::Command;
+use std::process::Stdio;
+use std::sync::Arc;
+use std::sync::Condvar;
+use std::sync::Mutex;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering;
+use std::time::Duration;
+
+use super::buffer::Buffer;
+use super::ports;
+use super::registry;
+use super::registry::Service;
+use super::server;
+use crate::Error;
+use crate::Result;
+use crate::history::now_ms;
 
 #[cfg(unix)]
 fn prepare_group(command: &mut Command) {
@@ -25,45 +31,35 @@ fn prepare_group(command: &mut Command) {
     command.process_group(0);
 }
 
-fn now_ms() -> u128 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis()
-}
-
-fn alive(pid: u32) -> bool {
-    Command::new("kill")
-        .args(["-0", &pid.to_string()])
-        .status()
-        .is_ok_and(|status| status.success())
-}
-
-#[allow(clippy::print_stdout)]
+/// Tee one child stream into the terminal and shared live buffer.
+#[expect(
+    clippy::print_stdout,
+    reason = "the supervisor tees child output to its terminal"
+)]
 fn forward<R: Read + Send + 'static>(
-    stream: &'static str,
+    stream: super::buffer::Stream,
     reader: R,
     shared: Arc<(Mutex<Buffer>, Condvar)>,
 ) -> std::thread::JoinHandle<()> {
     std::thread::spawn(move || {
         for line in BufReader::new(reader).lines() {
             let Ok(line) = line else { break };
-            if stream == "stdout" {
+            if stream == super::buffer::Stream::Stdout {
                 println!("{line}");
             } else {
                 eprintln!("{line}");
             }
             if let Ok(mut buffer) = shared.0.lock() {
-                buffer.push(stream, line);
+                buffer.push(stream.clone(), line);
                 shared.1.notify_all();
             }
         }
     })
 }
 
-fn supervise(name: &str, cmd: &[String]) -> std::io::Result<i32> {
-    let d = registry::dir()?;
-    std::fs::create_dir_all(&d)?;
+fn supervise(name: &str, cmd: &[String]) -> Result<i32> {
+    let run_directory = registry::dir()?;
+    std::fs::create_dir_all(&run_directory)?;
     let mut command = Command::new(&cmd[0]);
     command
         .args(&cmd[1..])
@@ -76,7 +72,7 @@ fn supervise(name: &str, cmd: &[String]) -> std::io::Result<i32> {
     let interrupted = Arc::new(AtomicBool::new(false));
     let signal_flag = interrupted.clone();
     ctrlc::set_handler(move || signal_flag.store(true, Ordering::SeqCst))
-        .map_err(|error| std::io::Error::other(error.to_string()))?;
+        .map_err(|error| Error::Io(std::io::Error::other(error.to_string())))?;
     let mut service = Service {
         name: name.into(),
         pid,
@@ -88,24 +84,26 @@ fn supervise(name: &str, cmd: &[String]) -> std::io::Result<i32> {
     if let Err(error) = registry::write(&service) {
         let _ = child.kill();
         let _ = child.wait();
-        return Err(error);
+        return Err(Error::Io(error));
     }
     let shared = Arc::new((Mutex::new(Buffer::default()), Condvar::new()));
-    if let Err(error) = server::serve(d.join(format!("{name}.sock")), shared.clone()) {
+    if let Err(error) = server::serve(run_directory.join(format!("{name}.sock")), shared.clone()) {
         let _ = child.kill();
         let _ = child.wait();
-        return Err(error);
+        return Err(Error::Io(error));
     }
     let stdout = child
         .stdout
         .take()
-        .map(|out| forward("stdout", out, shared.clone()));
+        .map(|out| forward(super::buffer::Stream::Stdout, out, shared.clone()));
     let stderr = child
         .stderr
         .take()
-        .map(|out| forward("stderr", out, shared.clone()));
+        .map(|out| forward(super::buffer::Stream::Stderr, out, shared.clone()));
     let started = std::time::Instant::now();
     let mut next_ports = Duration::ZERO;
+    let mut termination_started = None;
+    let mut force_killed = false;
     let status = loop {
         if started.elapsed() >= next_ports {
             service.ports = ports::listening(pid);
@@ -117,11 +115,20 @@ fn supervise(name: &str, cmd: &[String]) -> std::io::Result<i32> {
                     Duration::from_secs(10)
                 };
         }
-        if interrupted.load(Ordering::SeqCst) {
+        if interrupted.load(Ordering::SeqCst) && termination_started.is_none() {
             let _ = Command::new("kill")
-                .args(["-TERM", "-", &pid.to_string()])
+                .args(["-TERM", "--", &format!("-{pid}")])
                 .status();
-            let _ = child.kill();
+            termination_started = Some(std::time::Instant::now());
+        }
+        if !force_killed
+            && termination_started
+                .is_some_and(|started| started.elapsed() >= Duration::from_secs(5))
+        {
+            let _ = Command::new("kill")
+                .args(["-KILL", "--", &format!("-{pid}")])
+                .status();
+            force_killed = true;
         }
         if let Some(status) = child.try_wait()? {
             break status;
@@ -137,31 +144,26 @@ fn supervise(name: &str, cmd: &[String]) -> std::io::Result<i32> {
     Ok(status.code().unwrap_or(1))
 }
 
-pub fn run(name: &str, cmd: &[String]) -> std::io::Result<i32> {
+/// Start a service and supervise its process and live logs until it exits.
+pub fn run(name: &str, cmd: &[String]) -> Result<i32> {
     if cmd.is_empty() || name.is_empty() || name.contains('/') {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidInput,
-            "service name and command are required",
-        ));
+        return Err(Error::InvalidServiceName {
+            name: name.to_owned(),
+        });
     }
-    let d = registry::dir()?;
-    std::fs::create_dir_all(&d)?;
-    if let Ok(services) = registry::list() {
-        for service in services {
-            let sock = d.join(format!("{}.sock", service.name));
-            if alive(service.pid) {
-                if service.name == name {
-                    return Err(std::io::Error::new(
-                        std::io::ErrorKind::AlreadyExists,
-                        "service already running",
-                    ));
-                }
-            } else {
-                registry::remove(&service.name);
+    let run_directory = registry::dir()?;
+    std::fs::create_dir_all(&run_directory)?;
+    for service in registry::list()? {
+        let socket_path = run_directory.join(format!("{}.sock", service.name));
+        if service.name == name {
+            if UnixStream::connect(&socket_path).is_ok() {
+                return Err(Error::ServiceAlreadyRunning {
+                    name: name.to_owned(),
+                });
             }
-            if service.name == name && sock.exists() {
-                registry::remove(name);
-            }
+            registry::remove(name);
+        } else if UnixStream::connect(&socket_path).is_err() {
+            registry::remove(&service.name);
         }
     }
     let result = supervise(name, cmd);

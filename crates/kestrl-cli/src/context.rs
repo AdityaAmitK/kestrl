@@ -5,7 +5,6 @@ use std::io::IsTerminal;
 use kestrl_core::actor::Actor;
 
 #[derive(Debug)]
-#[expect(dead_code, reason = "read by commands as they are implemented")]
 pub struct Context {
     pub actor: Actor,
     /// Emit JSON instead of human-readable output.
