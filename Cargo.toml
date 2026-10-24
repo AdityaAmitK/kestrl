@@ -22,6 +22,8 @@ keyring = { version = "3", features = ["apple-native"] }
 ulid = "1"
 time = { version = "0.3", features = ["serde", "formatting", "parsing"] }
 directories = "5"
+regex = "1"
+ctrlc = { version = "3.5", features = ["termination"] }
 urlencoding = "2"
 rpassword = "7"
 

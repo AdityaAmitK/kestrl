@@ -1,9 +1,21 @@
-//! Shared terminal and JSON rendering for HTTP exchanges.
+//! Shared terminal and JSON rendering for CLI output.
 
 use std::io::Write;
 
 use kestrl_core::http::Exchange;
 
+/// Compact age such as `5s`, `12m`, `3h` or `2d`.
+pub fn age(milliseconds: i64) -> String {
+    let seconds = milliseconds.max(0) / 1000;
+    match seconds {
+        0..60 => format!("{seconds}s"),
+        60..3600 => format!("{}m", seconds / 60),
+        3600..86400 => format!("{}h", seconds / 3600),
+        _ => format!("{}d", seconds / 86400),
+    }
+}
+
+/// Write pretty-printed JSON to stdout.
 pub fn print_json(value: &serde_json::Value) -> anyhow::Result<()> {
     writeln!(
         std::io::stdout(),

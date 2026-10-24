@@ -50,6 +50,22 @@ pub enum Error {
     NoOpenSession,
     #[error("could not locate the application data directory")]
     NoDataDir,
+    /// The requested service has no live log socket.
+    #[error("service \"{name}\" is not running — start it with: kestrl up {name} -- <cmd>")]
+    ServiceNotRunning { name: String },
+    /// A service with this name already has a live log socket.
+    #[error("service \"{name}\" is already running")]
+    ServiceAlreadyRunning { name: String },
+    /// The service name or command is missing or invalid.
+    #[error("invalid service name: {name:?}")]
+    InvalidServiceName { name: String },
+    /// A `--grep` pattern could not be compiled.
+    #[error("invalid --grep pattern {pattern:?}: {source}")]
+    InvalidGrep {
+        pattern: String,
+        #[source]
+        source: regex::Error,
+    },
     #[error("invalid duration {0:?}; use a number followed by s, m, h or d, e.g. 30s, 2m, 1h, 2d")]
     InvalidDuration(String),
 }
