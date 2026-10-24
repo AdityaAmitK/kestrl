@@ -3,13 +3,16 @@
 pub mod db;
 pub mod envs;
 pub mod history;
+pub mod logs;
 pub mod output;
 pub mod profiles;
+pub mod ps;
 pub mod run;
 pub mod secret;
 pub mod send;
 pub mod session;
 pub mod tag;
+pub mod up;
 
 use clap::Args;
 use clap::Subcommand;
@@ -36,6 +39,12 @@ pub enum Command {
     Session(session::SessionArgs),
     /// Query databases and browse tables
     Db(db::DbArgs),
+    /// Start a service through Kestrl so its logs are collected
+    Up(up::UpArgs),
+    /// List running services and their ports
+    Ps(ps::PsArgs),
+    /// Tail or follow a service's live buffer
+    Logs(logs::LogsArgs),
 }
 
 /// Flags shared by commands that resolve variables and profiles.
@@ -63,5 +72,8 @@ pub fn dispatch(ctx: &Context, command: Command) -> anyhow::Result<()> {
         Command::Tag(args) => tag::run(ctx, args),
         Command::Session(args) => session::run(ctx, args),
         Command::Db(args) => db::run(ctx, args),
+        Command::Up(args) => up::run(ctx, args),
+        Command::Ps(args) => ps::run(ctx, args),
+        Command::Logs(args) => logs::run(ctx, args),
     }
 }
