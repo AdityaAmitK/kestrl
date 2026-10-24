@@ -53,14 +53,18 @@ impl History {
 
     /// Open the default database. `KESTRL_HISTORY_DB` overrides the path.
     pub fn open_default() -> Result<Self> {
-        let path = match std::env::var_os("KESTRL_HISTORY_DB") {
-            Some(path) => PathBuf::from(path),
-            None => ProjectDirs::from("", "", "kestrl")
-                .ok_or(Error::NoDataDir)?
-                .data_dir()
-                .join("history.db"),
-        };
-        Self::open(&path)
+        Self::open(&default_path()?)
+    }
+}
+
+/// Where the default database lives. `KESTRL_HISTORY_DB` overrides the path.
+pub fn default_path() -> Result<PathBuf> {
+    match std::env::var_os("KESTRL_HISTORY_DB") {
+        Some(path) => Ok(PathBuf::from(path)),
+        None => Ok(ProjectDirs::from("", "", "kestrl")
+            .ok_or(Error::NoDataDir)?
+            .data_dir()
+            .join("history.db")),
     }
 }
 

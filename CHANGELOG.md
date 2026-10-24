@@ -22,6 +22,8 @@ All notable changes are documented here. The format follows [Keep a Changelog](h
 - `[retention]` in `.kestrl/kestrl.toml`: `max_age_days`, `max_events`, `max_body_bytes`.
 - `kestrl-ffi`: UniFFI bindings for the SwiftUI app. Workspace, request send, history, environment and secret functions, with one `KestrlError` type. Listed in `PLAN.md` under FFI surface.
 - `scripts/build-xcframework.sh`: builds `KestrlFFI.xcframework` (arm64 and x86_64) and the Swift bindings.
+- macOS app (`app/`, SwiftUI over `kestrl-ffi`): browse and send request files, ad-hoc requests, response view with Copy JSON, history with tags, notes and compare, environments, secrets, and read-only settings. `scripts/build-app.sh` builds it.
+- `kestrl-ffi::read_request_file` returns a request as written, with variables unresolved.
 
 ### Changed
 - `--since` accepts seconds (`30s`) as well as minutes, hours and days.
