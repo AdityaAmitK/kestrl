@@ -1,6 +1,9 @@
 //! Secrets live in the macOS Keychain (service "kestrl"), referenced as
 //! `{{secret:name}}`. Resolved values are tracked so output can be masked.
 
+use std::collections::BTreeSet;
+use std::path::Path;
+
 use crate::{Error, Result};
 
 const SERVICE: &str = "kestrl";
@@ -16,8 +19,54 @@ pub fn get(name: &str) -> Result<String> {
     }
 }
 
-pub fn referenced_names(text: &str) -> std::collections::BTreeSet<String> {
-    let mut names = std::collections::BTreeSet::new();
+/// Whether the Keychain holds a value for `name`.
+pub fn is_set(name: &str) -> Result<bool> {
+    match get(name) {
+        Ok(_) => Ok(true),
+        Err(Error::SecretNotSet { .. }) => Ok(false),
+        Err(error) => Err(error),
+    }
+}
+
+/// Every secret name the workspace refers to: in `.kestrl/` and in request files.
+pub fn referenced_in_workspace(root: &Path) -> Result<BTreeSet<String>> {
+    let mut found = BTreeSet::new();
+    let kestrl_dir = root.join(".kestrl");
+    if kestrl_dir.is_dir() {
+        scan(&kestrl_dir, true, &mut found)?;
+    }
+    scan(root, false, &mut found)?;
+    Ok(found)
+}
+
+fn scan(dir: &Path, is_kestrl: bool, found: &mut BTreeSet<String>) -> Result<()> {
+    for entry in std::fs::read_dir(dir)? {
+        let path = entry?.path();
+        if path.is_dir() {
+            let name = path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .unwrap_or_default();
+            if name == "target" || name == "node_modules" || name == ".git" || name.starts_with('.')
+            {
+                continue;
+            }
+            scan(&path, is_kestrl || name == ".kestrl", found)?;
+        } else if (is_kestrl
+            || path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.ends_with(".req.toml")))
+            && let Ok(content) = std::fs::read_to_string(&path)
+        {
+            found.extend(referenced_names(&content));
+        }
+    }
+    Ok(())
+}
+
+pub fn referenced_names(text: &str) -> BTreeSet<String> {
+    let mut names = BTreeSet::new();
     let mut rest = text;
     while let Some(start) = rest.find("{{secret:") {
         rest = &rest[start + 9..];

@@ -54,12 +54,57 @@ pub fn load_variables(root: &Path, env: Option<&str>) -> Result<(String, Variabl
     ))
 }
 
+/// Directories that never hold request files.
+const SKIPPED_DIRS: [&str; 3] = ["target", "node_modules", ".git"];
+
+/// Every `*.req.toml` under `root`, as paths relative to it, sorted.
+pub fn request_files(root: &Path) -> Result<Vec<String>> {
+    let mut found = Vec::new();
+    collect_request_files(root, root, &mut found)?;
+    found.sort();
+    Ok(found)
+}
+
+fn collect_request_files(root: &Path, dir: &Path, found: &mut Vec<String>) -> Result<()> {
+    let entries = std::fs::read_dir(dir).map_err(|source| Error::Read {
+        path: dir.to_owned(),
+        source,
+    })?;
+    for entry in entries {
+        let path = entry?.path();
+        let name = path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or_default();
+        if path.is_dir() {
+            if !SKIPPED_DIRS.contains(&name) {
+                collect_request_files(root, &path, found)?;
+            }
+        } else if name.ends_with(".req.toml") {
+            found.push(
+                path.strip_prefix(root)
+                    .unwrap_or(&path)
+                    .display()
+                    .to_string(),
+            );
+        }
+    }
+    Ok(())
+}
+
+/// Names of the `.toml` files in `dir`. A missing directory has none.
 pub(crate) fn names(dir: &Path) -> Result<Vec<String>> {
-    let mut names = std::fs::read_dir(dir)
-        .map_err(|source| Error::Read {
-            path: dir.to_owned(),
-            source,
-        })?
+    let entries = match std::fs::read_dir(dir) {
+        Ok(entries) => entries,
+        Err(source) if source.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(source) => {
+            return Err(Error::Read {
+                path: dir.to_owned(),
+                source,
+            });
+        }
+    };
+    let mut names = entries
         .filter_map(|entry| entry.ok().map(|entry| entry.path()))
         .filter(|path| {
             path.extension()

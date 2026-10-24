@@ -16,8 +16,12 @@ All notable changes are documented here. The format follows [Keep a Changelog](h
 - `kestrl history replay <id>`: sends a stored request again. If its secrets were masked, it is re-resolved from its request file with the event's environment.
 - `kestrl history diff <a> <b>`: compares status, duration, response headers, and body (JSON paths or changed lines).
 - `[retention]` in `.kestrl/kestrl.toml`: `max_age_days`, `max_events`, `max_body_bytes`.
+- `kestrl-ffi`: UniFFI bindings for the SwiftUI app. Workspace, request send, history, environment and secret functions, with one `KestrlError` type. Listed in `PLAN.md` under FFI surface.
+- `scripts/build-xcframework.sh`: builds `KestrlFFI.xcframework` (arm64 and x86_64) and the Swift bindings.
 
 ### Changed
 - `--since` accepts seconds (`30s`) as well as minutes, hours and days.
 - Database queries use PostgreSQL result metadata to report affected rows, decode common date/time, UUID, JSON and numeric types, and support `sslmode=require`.
 - Database query history uses workspace retention settings and records the active session.
+- Sending and recording a request moved from the CLI into `kestrl-core::send`. CLI behavior is unchanged.
+- A missing `.kestrl/envs/` or `.kestrl/profiles/` directory is an empty list, not an error.

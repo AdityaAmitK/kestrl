@@ -1,11 +1,7 @@
 //! `kestrl envs`: list environments, or show one with resolved variables.
 
 use clap::Args;
-use kestrl_core::{
-    env::Environment,
-    vars::Variables,
-    workspace::{self, WorkspaceConfig},
-};
+use kestrl_core::{env::Environment, workspace};
 use std::io::Write;
 
 use crate::context::Context;
@@ -18,21 +14,7 @@ pub struct EnvsArgs {
 pub fn run(ctx: &Context, args: EnvsArgs) -> anyhow::Result<()> {
     let root = workspace::find_root(&std::env::current_dir()?)?;
     if let Some(name) = args.name {
-        let config = WorkspaceConfig::load(&root)?;
-        let env = Environment::load(&root, &name)?;
-        let mut vars = Variables {
-            workspace: config.vars,
-            environment: env.vars,
-            ..Variables::default()
-        };
-        let values = vars.environment.clone();
-        let resolved = values
-            .into_iter()
-            .map(|(key, value)| {
-                let value = vars.resolve(&value)?;
-                Ok::<_, kestrl_core::Error>((key, vars.redactor.redact(&value)))
-            })
-            .collect::<kestrl_core::Result<std::collections::BTreeMap<_, _>>>()?;
+        let resolved = Environment::resolved(&root, &name)?;
         if ctx.is_json {
             writeln!(
                 std::io::stdout(),
