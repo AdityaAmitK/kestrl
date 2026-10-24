@@ -278,7 +278,7 @@ fn write_row(out: &mut impl Write, event: &EventSummary, now: i64) -> io::Result
         out,
         "{}  {:>4}  {:<12}  {}  {}",
         event.id,
-        age(now - event.ts),
+        crate::commands::output::age(now - event.ts),
         event.actor,
         event.summary,
         tags.join(" ")
@@ -288,7 +288,11 @@ fn write_row(out: &mut impl Write, event: &EventSummary, now: i64) -> io::Result
 fn write_detail(out: &mut impl Write, detail: &EventDetail) -> io::Result<()> {
     let event = &detail.event;
     writeln!(out, "{}  {}", event.id, event.summary)?;
-    writeln!(out, "when:      {} ago", age(now_ms() - event.ts))?;
+    writeln!(
+        out,
+        "when:      {} ago",
+        crate::commands::output::age(now_ms() - event.ts)
+    )?;
     writeln!(out, "actor:     {}", event.actor)?;
     writeln!(out, "source:    {}", event.source)?;
     for (label, value) in [
@@ -331,15 +335,4 @@ fn write_detail(out: &mut impl Write, detail: &EventDetail) -> io::Result<()> {
         }
     }
     Ok(())
-}
-
-/// Compact age such as `5s`, `12m`, `3h` or `2d`.
-fn age(ms: i64) -> String {
-    let secs = ms.max(0) / 1000;
-    match secs {
-        0..60 => format!("{secs}s"),
-        60..3600 => format!("{}m", secs / 60),
-        3600..86400 => format!("{}h", secs / 3600),
-        _ => format!("{}d", secs / 86400),
-    }
 }

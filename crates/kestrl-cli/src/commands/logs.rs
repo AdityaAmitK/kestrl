@@ -117,25 +117,16 @@ pub fn run(context: &Context, args: LogsArgs) -> anyhow::Result<()> {
 
     let mut stdout = io::stdout().lock();
     client::read(&service, &query, |line| {
-        write_log_line(&mut stdout, context.is_json, &line).map(|()| true)
+        write_log_line(&mut stdout, context.is_json, context.utc_offset, &line).map(|()| true)
     })?;
     Ok(())
 }
 
-fn write_log_line(stdout: &mut impl Write, is_json: bool, line: &LogLine) -> io::Result<()> {
+fn write_log_line(stdout: &mut impl Write, is_json: bool, offset: time::UtcOffset, line: &LogLine) -> io::Result<()> {
     if is_json {
         writeln!(stdout, "{}", serde_json::to_string(line)?)
     } else {
-        let timestamp = line.ts_ms;
-        let seconds = timestamp / 1000;
-        let milliseconds = timestamp % 1000;
-        let clock = format!(
-            "{:02}:{:02}:{:02}.{:03}",
-            (seconds / 3600) % 24,
-            (seconds / 60) % 60,
-            seconds % 60,
-            milliseconds
-        );
+        let clock = crate::commands::output::clock(line.ts_ms, offset);
         match line.stream {
             Stream::Stderr => writeln!(stdout, "{clock} [stderr] {}", line.text),
             Stream::Stdout => writeln!(stdout, "{clock}  {}", line.text),

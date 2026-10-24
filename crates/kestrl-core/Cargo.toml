@@ -15,14 +15,21 @@ keyring.workspace = true
 ulid.workspace = true
 time.workspace = true
 directories.workspace = true
+urlencoding.workspace = true
 ctrlc.workspace = true
 regex.workspace = true
-urlencoding.workspace = true
 postgres.workspace = true
 postgres-types.workspace = true
 postgres-native-tls.workspace = true
 native-tls.workspace = true
 uuid.workspace = true
+hudsucker.workspace = true
+rcgen.workspace = true
+tokio.workspace = true
+http-body-util.workspace = true
+bytes.workspace = true
+flate2.workspace = true
+brotli.workspace = true
 
 [lints]
 workspace = true

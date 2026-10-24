@@ -16,6 +16,8 @@ toml.workspace = true
 rpassword.workspace = true
 clap.workspace = true
 regex.workspace = true
+time.workspace = true
+ctrlc.workspace = true
 
 [lints]
 workspace = true

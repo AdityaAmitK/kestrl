@@ -3,6 +3,21 @@
 use std::io::Write;
 
 use kestrl_core::http::Exchange;
+use time::{OffsetDateTime, UtcOffset};
+
+/// Format an epoch millisecond timestamp in the CLI's captured local offset.
+pub fn clock(ts_ms: i64, offset: UtcOffset) -> String {
+    let timestamp = OffsetDateTime::from_unix_timestamp_nanos(i128::from(ts_ms) * 1_000_000)
+        .unwrap_or(OffsetDateTime::UNIX_EPOCH)
+        .to_offset(offset);
+    format!(
+        "{:02}:{:02}:{:02}.{:03}",
+        timestamp.hour(),
+        timestamp.minute(),
+        timestamp.second(),
+        timestamp.millisecond()
+    )
+}
 
 /// Compact age such as `5s`, `12m`, `3h` or `2d`.
 pub fn age(milliseconds: i64) -> String {

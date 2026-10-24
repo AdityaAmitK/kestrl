@@ -50,6 +50,8 @@ pub enum Error {
     NoOpenSession,
     #[error("could not locate the application data directory")]
     NoDataDir,
+    #[error("capture failed: {0}")]
+    Capture(String),
     #[error("unknown connection \"{0}\"")]
     UnknownConnection(String),
     #[error("connection \"{connection}\" has no entry for env \"{env}\"")]

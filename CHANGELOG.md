@@ -5,6 +5,10 @@ All notable changes are documented here. The format follows [Keep a Changelog](h
 ## [Unreleased]
 
 ### Added
+- Device capture binds its interception proxy to loopback, restores system proxy settings after panics and crashes, skips disabled or device-less network services, and retries incomplete restores.
+- Device capture can run outside a Kestrl workspace and prints local-time capture lines when stdout is redirected; Tokio runtime and session ordering are managed by core.
+- `kestrl capture sim|android` live device capture, Kestrl root CA management, macOS system proxy recovery, and optional capture history.
+- `kestrl proxy trust --sim|--android`, `kestrl proxy ca`, and `kestrl proxy restore`.
 - Project plan, cargo workspace scaffold, and open-source project files.
 - Memory-only service supervision and log buffers, service listing, log queries with tail, grep and follow, and file/Docker attach commands.
 - `kestrl send`, `run`, `envs`, `profiles` and `secret`: request files, environments, variables, profiles, and Keychain secrets masked in all output.

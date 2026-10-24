@@ -80,6 +80,18 @@ pub fn referenced_names(text: &str) -> BTreeSet<String> {
     names
 }
 
+/// Resolve every secret referenced by TOML files in a workspace for output masking.
+pub fn workspace_redactor(root: &Path) -> Result<Redactor> {
+    let names = referenced_in_workspace(root)?;
+    let mut redactor = Redactor::default();
+    for name in names {
+        if let Ok(value) = get(&name) {
+            redactor.track(&name, &value);
+        }
+    }
+    Ok(redactor)
+}
+
 pub fn set(name: &str, value: &str) -> Result<()> {
     Ok(keyring::Entry::new(SERVICE, name)?.set_password(value)?)
 }

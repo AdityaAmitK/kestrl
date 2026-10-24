@@ -36,7 +36,8 @@ impl From<kestrl_core::Error> for KestrlError {
             | Error::Http(_)
             | Error::Database(_)
             | Error::ServiceNotRunning { .. }
-            | Error::ServiceAlreadyRunning { .. } => Self::Request { message },
+            | Error::ServiceAlreadyRunning { .. }
+            | Error::Capture(_) => Self::Request { message },
             Error::SecretNotSet { .. } | Error::Keychain(_) => Self::Secret { message },
             Error::InvalidMethod(_)
             | Error::InvalidDuration(_)
