@@ -7,10 +7,14 @@ struct LogLinesView: View {
 
     var body: some View {
         ScrollViewReader { proxy in
-            ScrollView {
+            ScrollView(store.wrapLogLines ? .vertical : [.vertical, .horizontal]) {
                 LazyVStack(alignment: .leading, spacing: 0) {
                     ForEach(store.logLines, id: \.seq) { line in
-                        LogLineRow(line: line, isSelected: store.selectedLogSeqs.contains(line.seq))
+                        LogLineRow(
+                            line: line,
+                            isSelected: store.selectedLogSeqs.contains(line.seq),
+                            wrapsLines: store.wrapLogLines
+                        )
                             .id(line.seq)
                             .contentShape(Rectangle())
                             .onTapGesture {

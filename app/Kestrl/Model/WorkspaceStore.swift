@@ -9,6 +9,7 @@ final class WorkspaceStore {
     private static let lastWorkspaceKey = "lastWorkspacePath"
     private static let sectionKey = "selectedSection"
     private static let appearanceKey = "debugAppearance"
+    private static let wrapLogLinesKey = "wrapLogLines"
 
     private let defaults: UserDefaults
 
@@ -52,6 +53,10 @@ final class WorkspaceStore {
     var appearance: AppearanceOverride {
         didSet { defaults.set(appearance.rawValue, forKey: Self.appearanceKey) }
     }
+    /// Whether long log lines wrap. Off, each line stays on one row and the log scrolls sideways.
+    var wrapLogLines: Bool {
+        didSet { defaults.set(wrapLogLines, forKey: Self.wrapLogLinesKey) }
+    }
     var selectedRequest: String?
     /// The environment requests are sent with
     var selectedEnvironment: String?
@@ -84,6 +89,7 @@ final class WorkspaceStore {
         self.defaults = defaults
         section = SidebarSection(rawValue: defaults.string(forKey: Self.sectionKey) ?? "") ?? .requests
         appearance = AppearanceOverride(rawValue: defaults.string(forKey: Self.appearanceKey) ?? "") ?? .system
+        wrapLogLines = defaults.bool(forKey: Self.wrapLogLinesKey)
     }
 
     var canSendAdHoc: Bool {
