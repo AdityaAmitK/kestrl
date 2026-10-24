@@ -172,7 +172,7 @@ kestrl history [query] [--actor a] [--tag t] [--since 1h] [--session id] [--limi
 kestrl history show|replay <id>
 kestrl history diff <a> <b>
 kestrl history edit <id> [--actor a] [--note text]
-kestrl tag <id> <tag>
+kestrl tag <id> <tag> [--remove]
 kestrl session start [name] | end
 
 # Services and logs

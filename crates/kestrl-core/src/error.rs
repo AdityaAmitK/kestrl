@@ -24,4 +24,14 @@ pub enum Error {
     Keychain(#[from] keyring::Error),
     #[error(transparent)]
     Sqlite(#[from] rusqlite::Error),
+    #[error(transparent)]
+    Json(#[from] serde_json::Error),
+    #[error("no history event starts with {0:?}")]
+    EventNotFound(String),
+    #[error("more than one history event starts with {0:?}; use a longer prefix")]
+    AmbiguousId(String),
+    #[error("no session is open")]
+    NoOpenSession,
+    #[error("could not locate the application data directory")]
+    NoDataDir,
 }

@@ -12,7 +12,7 @@ use crate::context::Context;
 #[command(name = "kestrl", version, about = "Local-first backend workbench")]
 struct Cli {
     /// Who is running this command (me, cursor, claude-code, codex, ...)
-    #[arg(long, global = true)]
+    #[arg(long)]
     actor: Option<String>,
     /// Force JSON output (default when stdout is not a terminal)
     #[arg(long, global = true)]
