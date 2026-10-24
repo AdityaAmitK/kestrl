@@ -39,6 +39,8 @@ http-body-util = "0.1"
 bytes = "1"
 flate2 = "1"
 brotli = "9"
+tungstenite = { version = "0.26", features = ["rustls-tls-native-roots"] }
+base64 = "0.22"
 
 [profile.release]
 lto = "thin"

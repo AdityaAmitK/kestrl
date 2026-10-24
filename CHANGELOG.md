@@ -5,6 +5,8 @@ All notable changes are documented here. The format follows [Keep a Changelog](h
 ## [Unreleased]
 
 ### Added
+- `kestrl capture browser`: launch an isolated Chromium-family browser and capture HTTP exchanges through Chrome DevTools Protocol, with optional host filters and history recording.
+- Browser capture detects browser bundle executables from Info.plist in `/Applications` and `~/Applications`, supports Helium, and accepts `--browser-path` for other Chromium-family browsers.
 - Device capture binds its interception proxy to loopback, restores system proxy settings after panics and crashes, skips disabled or device-less network services, and retries incomplete restores.
 - Device capture can run outside a Kestrl workspace and prints local-time capture lines when stdout is redirected; Tokio runtime and session ordering are managed by core.
 - `kestrl capture sim|android` live device capture, Kestrl root CA management, macOS system proxy recovery, and optional capture history.

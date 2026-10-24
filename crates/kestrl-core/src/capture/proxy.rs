@@ -176,14 +176,31 @@ impl HttpHandler for CaptureHandler {
     }
 }
 
-fn host_matches(pattern: &str, host: &str) -> bool {
-    if pattern == "*" {
-        return true;
+pub(crate) fn host_matches(pattern: &str, host: &str) -> bool {
+    let pattern = pattern.to_ascii_lowercase();
+    let host = host.to_ascii_lowercase();
+    let mut parts = pattern.split('*').peekable();
+    let anchored_start = !pattern.starts_with('*');
+    let anchored_end = !pattern.ends_with('*');
+    let mut remaining = host.as_str();
+    let mut first = true;
+    while let Some(part) = parts.next() {
+        if part.is_empty() {
+            continue;
+        }
+        let Some(index) = remaining.find(part) else {
+            return false;
+        };
+        if first && anchored_start && index != 0 {
+            return false;
+        }
+        remaining = &remaining[index + part.len()..];
+        first = false;
+        if parts.peek().is_none() && anchored_end && !remaining.is_empty() {
+            return false;
+        }
     }
-    if let Some(suffix) = pattern.strip_prefix('*') {
-        return host.ends_with(suffix);
-    }
-    pattern.eq_ignore_ascii_case(host)
+    true
 }
 
 fn display_body(bytes: &[u8], encoding: Option<&str>) -> Option<String> {
