@@ -6,6 +6,7 @@
 mod edit;
 mod query;
 mod record;
+mod record_db;
 mod retention;
 mod session;
 
@@ -19,6 +20,7 @@ use crate::{Error, Result};
 
 pub use query::{EventDetail, EventSummary, HistoryFilter, HttpExchange};
 pub use record::NewHttpEvent;
+pub use record_db::NewDbEvent;
 pub use retention::RetentionOptions;
 pub use session::Session;
 
@@ -30,6 +32,17 @@ pub struct History {
 }
 
 impl History {
+    pub fn record_db(&mut self, event: &NewDbEvent) -> Result<String> {
+        record_db::record_db(self, event)
+    }
+    pub(crate) fn transaction(&mut self) -> Result<rusqlite::Transaction<'_>> {
+        Ok(self.conn.transaction()?)
+    }
+
+    pub(crate) fn prune_default(&mut self) -> Result<()> {
+        self.prune(&RetentionOptions::default()).map(|_| ())
+    }
+
     pub fn open(path: &Path) -> Result<Self> {
         if let Some(dir) = path.parent() {
             std::fs::create_dir_all(dir)?;

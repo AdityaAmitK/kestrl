@@ -10,3 +10,4 @@ All notable changes are documented here. The format follows [Keep a Changelog](h
 - History store: events, sessions, tags and notes in SQLite, pruned to the last 7 days or 500 unsaved events; saved (tagged or noted) events are kept.
 - `kestrl history [query] [--by actor] [--tag] [--since 30m|1h|2d] [--session] [--limit]`, `history show <id>`, `history edit <id> [--set-actor] [--note]`; ids may be unique prefixes.
 - `kestrl tag <id> <tag> [--remove]` and `kestrl session start [name]` / `session end`.
+- `kestrl db connections`, `db query` and `db tables` for environment-specific PostgreSQL connections, read-only query enforcement, table browsing and recorded query history.

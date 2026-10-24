@@ -183,7 +183,8 @@ kestrl logs attach <service> --file <path> | --docker <container>
 
 # Database
 kestrl db query <connection> "<sql>" [-e env] [--json]
-kestrl db tables <connection> [-e env]
+kestrl db tables <connection> [-e env] [table]
+kestrl db connections
 
 # Capture
 kestrl capture sim|android|browser [--save]

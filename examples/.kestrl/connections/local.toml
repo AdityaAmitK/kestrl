@@ -1,0 +1,5 @@
+kind = "postgres"
+allow_writes = ["local"]
+
+[env.local]
+url = "postgres://{{secret:db_local_user}}:{{secret:db_local_pass}}@localhost:5432/postgres"

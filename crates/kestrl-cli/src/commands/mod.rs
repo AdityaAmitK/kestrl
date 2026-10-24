@@ -1,5 +1,6 @@
 //! One module per subcommand. Each exposes `<Name>Args` and `run`.
 
+pub mod db;
 pub mod envs;
 pub mod history;
 pub mod output;
@@ -33,6 +34,8 @@ pub enum Command {
     Tag(tag::TagArgs),
     /// Start or end a session
     Session(session::SessionArgs),
+    /// Query databases and browse tables
+    Db(db::DbArgs),
 }
 
 /// Flags shared by commands that resolve variables and profiles.
@@ -59,5 +62,6 @@ pub fn dispatch(ctx: &Context, command: Command) -> anyhow::Result<()> {
         Command::History(args) => history::run(ctx, args),
         Command::Tag(args) => tag::run(ctx, args),
         Command::Session(args) => session::run(ctx, args),
+        Command::Db(args) => db::run(ctx, args),
     }
 }

@@ -16,6 +16,8 @@ ulid.workspace = true
 time.workspace = true
 directories.workspace = true
 urlencoding.workspace = true
+postgres.workspace = true
+postgres-types.workspace = true
 
 [lints]
 workspace = true
