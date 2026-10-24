@@ -16,6 +16,8 @@ keyring.workspace = true
 ulid.workspace = true
 time.workspace = true
 directories.workspace = true
+regex.workspace = true
+ctrlc.workspace = true
 
 [lints]
 workspace = true

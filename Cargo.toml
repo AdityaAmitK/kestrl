@@ -23,6 +23,8 @@ keyring = { version = "3", features = ["apple-native"] }
 ulid = "1"
 time = { version = "0.3", features = ["serde", "formatting", "parsing"] }
 directories = "5"
+regex = "1"
+ctrlc = "3.5"
 
 [profile.release]
 lto = "thin"

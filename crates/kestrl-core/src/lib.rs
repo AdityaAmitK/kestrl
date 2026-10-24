@@ -7,5 +7,6 @@ pub mod error;
 pub mod history;
 pub mod request;
 pub mod secrets;
+pub mod services;
 
 pub use error::{Error, Result};
