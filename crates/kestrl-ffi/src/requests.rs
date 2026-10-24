@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 
 use kestrl_core::actor::Actor;
 use kestrl_core::http;
+use kestrl_core::request::{self, Body};
 use kestrl_core::send::{self as core_send, SendOptions, Target};
 
 use crate::error::KestrlError;
@@ -25,6 +26,55 @@ pub struct SentExchange {
     pub error: Option<String>,
     /// Names of the secrets that were masked in this exchange
     pub redacted: Vec<String>,
+}
+
+/// A request file as written, with `{{variables}}` left unresolved.
+#[derive(Debug, uniffi::Record)]
+pub struct RequestDetail {
+    pub name: Option<String>,
+    pub method: String,
+    pub url: String,
+    pub profiles: Vec<String>,
+    pub headers: Vec<KeyValue>,
+    pub query: Vec<KeyValue>,
+    /// `json`, `text` or `form`; unset when the request has no body
+    pub body_kind: Option<String>,
+    /// Form fields are shown as `key = value` lines
+    pub body: Option<String>,
+}
+
+/// Read the request file at `path` without sending it.
+#[uniffi::export]
+pub fn read_request_file(
+    workspace_root: String,
+    path: String,
+) -> Result<RequestDetail, KestrlError> {
+    let file = request::load(&PathBuf::from(workspace_root).join(path))?;
+    let (body_kind, body) = match file.body {
+        None => (None, None),
+        Some(Body::Json { content }) => (Some("json"), Some(content)),
+        Some(Body::Text { content }) => (Some("text"), Some(content)),
+        Some(Body::Form { fields }) => (
+            Some("form"),
+            Some(
+                fields
+                    .iter()
+                    .map(|(key, value)| format!("{key} = {value}"))
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+            ),
+        ),
+    };
+    Ok(RequestDetail {
+        name: file.name,
+        method: file.method,
+        url: file.url,
+        profiles: file.profiles,
+        headers: KeyValue::from_map(file.headers),
+        query: KeyValue::from_map(file.query),
+        body_kind: body_kind.map(str::to_owned),
+        body,
+    })
 }
 
 /// Send the request file at `path`, relative to the workspace root.
