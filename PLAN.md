@@ -142,7 +142,7 @@ url = "postgres://{{secret:db_local_user}}:{{secret:db_local_pass}}@localhost:54
 | Saved events (tagged or noted) | Until deleted |
 | Bodies | Cut to 1 MB when stored |
 
-All limits are configurable in `.kestrl/kestrl.toml` under `[retention]`.
+All limits are configurable in `.kestrl/kestrl.toml` under `[retention]`: `max_age_days`, `max_events`, `max_body_bytes`.
 
 ## History schema
 
@@ -169,7 +169,7 @@ kestrl secret set|rm|ls [name]             # `set` reads the value from stdin or
 
 # History
 kestrl history [query] [--by actor] [--tag t] [--since 1h] [--session id] [--limit n]
-kestrl history show|replay <id>
+kestrl history show|replay <id>            # replay re-resolves from the request file if secrets were masked
 kestrl history diff <a> <b>
 kestrl history edit <id> [--set-actor a] [--note text]
 kestrl tag <id> <tag> [--remove]

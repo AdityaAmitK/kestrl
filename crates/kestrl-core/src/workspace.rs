@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 
+use crate::history::RetentionOptions;
 use crate::{Error, Result};
 
 #[derive(Debug, Default, Deserialize)]
@@ -12,6 +13,8 @@ pub struct WorkspaceConfig {
     pub default_env: Option<String>,
     #[serde(default)]
     pub vars: BTreeMap<String, String>,
+    #[serde(default)]
+    pub retention: RetentionOptions,
 }
 
 pub fn find_root(from: &Path) -> Result<PathBuf> {

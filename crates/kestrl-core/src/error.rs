@@ -66,4 +66,6 @@ pub enum Error {
         #[source]
         source: regex::Error,
     },
+    #[error("invalid duration {0:?}; use a number followed by s, m, h or d, e.g. 30s, 2m, 1h, 2d")]
+    InvalidDuration(String),
 }

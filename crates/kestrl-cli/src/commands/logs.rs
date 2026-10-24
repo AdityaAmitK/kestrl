@@ -9,7 +9,7 @@ use anyhow::bail;
 use clap::ArgGroup;
 use clap::Args;
 use clap::Subcommand;
-use kestrl_core::history::now_ms;
+use kestrl_core::duration::parse_since;
 use kestrl_core::services::buffer::{LogLine, Stream};
 use kestrl_core::services::client::{self, Query};
 
@@ -26,7 +26,7 @@ pub struct LogsArgs {
     /// Follow new log lines
     #[arg(short, long)]
     pub follow: bool,
-    /// Show logs from the last duration (e.g. 2m)
+    /// Only lines from the last 30s, 2m, 1h or 2d
     #[arg(long)]
     pub since: Option<String>,
     /// Filter log text with a regular expression
@@ -108,12 +108,7 @@ pub fn run(context: &Context, args: LogsArgs) -> anyhow::Result<()> {
             source,
         })?;
     }
-    let since_ms = args
-        .since
-        .as_deref()
-        .map(parse_since)
-        .transpose()?
-        .map(|duration_ms| now_ms().saturating_sub(duration_ms));
+    let since_ms = args.since.as_deref().map(parse_since).transpose()?;
     let query = Query {
         since_ms,
         grep: args.grep,
@@ -124,8 +119,7 @@ pub fn run(context: &Context, args: LogsArgs) -> anyhow::Result<()> {
     let mut stdout = io::stdout().lock();
     client::read(&service, &query, |line| {
         write_log_line(&mut stdout, context.is_json, &line).map(|()| true)
-    })
-    .context("failed to read service logs")?;
+    })?;
     Ok(())
 }
 
@@ -148,25 +142,4 @@ fn write_log_line(stdout: &mut impl Write, is_json: bool, line: &LogLine) -> io:
             Stream::Stdout => writeln!(stdout, "{clock}  {}", line.text),
         }
     }
-}
-
-/// Parse a duration such as `30s`, `2m`, `1h` or `3d` into milliseconds.
-fn parse_since(spec: &str) -> anyhow::Result<i64> {
-    let (amount, unit) = spec.split_at(
-        spec.find(|character: char| !character.is_ascii_digit())
-            .unwrap_or(spec.len()),
-    );
-    let amount = amount
-        .parse::<i64>()
-        .with_context(|| format!("invalid --since duration {spec:?}"))?;
-    let multiplier = match unit {
-        "s" => 1_000,
-        "m" => 60_000,
-        "h" => 3_600_000,
-        "d" => 86_400_000,
-        _ => bail!("invalid duration {spec:?}; use a number followed by s, m, h or d"),
-    };
-    amount
-        .checked_mul(multiplier)
-        .ok_or_else(|| anyhow::anyhow!("duration is too large"))
 }

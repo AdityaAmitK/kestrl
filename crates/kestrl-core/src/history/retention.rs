@@ -8,11 +8,15 @@ use crate::Result;
 
 const DAY_MS: i64 = 24 * 60 * 60 * 1000;
 
-/// How much unsaved history to keep.
+/// How much unsaved history to keep, and how much of each body to store.
+/// Missing keys in `[retention]` take the defaults.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(default)]
 pub struct RetentionOptions {
     pub max_age_days: u32,
     pub max_events: u32,
+    /// Bodies are cut to this many bytes before storage.
+    pub max_body_bytes: usize,
 }
 
 impl Default for RetentionOptions {
@@ -20,6 +24,7 @@ impl Default for RetentionOptions {
         Self {
             max_age_days: 7,
             max_events: 500,
+            max_body_bytes: 1024 * 1024,
         }
     }
 }

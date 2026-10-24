@@ -1,16 +1,19 @@
-//! `kestrl send`: send one request (file or METHOD URL).
+//! `kestrl send`: send one request (file or METHOD URL), recording it in history.
 
 use std::collections::BTreeMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
+use anyhow::bail;
 use clap::Args;
 use kestrl_core::env::Environment;
+use kestrl_core::history::{EventMeta, History, NewHttpEvent, RetentionOptions};
 use kestrl_core::http;
 use kestrl_core::request;
 use kestrl_core::secrets;
 use kestrl_core::vars::Variables;
 use kestrl_core::workspace::{self, WorkspaceConfig};
 
+use crate::commands::output;
 use crate::context::Context;
 
 #[derive(Debug, Args)]
@@ -25,13 +28,20 @@ pub struct SendArgs {
     pub tag: Option<String>,
 }
 
+/// An exchange and the history event recorded for it.
+pub struct Sent {
+    pub exchange: http::Exchange,
+    /// `None` when recording failed; a warning has already been printed.
+    pub event_id: Option<String>,
+}
+
 pub fn send_one(
     ctx: &Context,
     target: &[String],
     resolve: &crate::commands::ResolveArgs,
-) -> anyhow::Result<http::Exchange> {
+) -> anyhow::Result<Sent> {
     let client = http::client()?;
-    send_one_with_client(ctx, target, resolve, &client)
+    send_one_with_client(ctx, target, resolve, &client, None)
 }
 
 pub fn send_one_with_client(
@@ -39,12 +49,9 @@ pub fn send_one_with_client(
     target: &[String],
     resolve: &crate::commands::ResolveArgs,
     client: &http::Client,
-) -> anyhow::Result<http::Exchange> {
-    let _actor = &ctx.actor;
-    let root = match workspace::find_root(&std::env::current_dir()?) {
-        Ok(root) => root,
-        Err(_) => std::env::current_dir()?,
-    };
+    correlation: Option<&str>,
+) -> anyhow::Result<Sent> {
+    let root = workspace_root()?;
     let config = WorkspaceConfig::load(&root)?;
     let env_name = resolve.env.as_deref().or(config.default_env.as_deref());
     let env_name = env_name.unwrap_or("local");
@@ -75,6 +82,11 @@ pub fn send_one_with_client(
         workspace: config.vars.clone(),
         redactor: secrets::Redactor::default(),
     };
+    let request_ref = if target.len() == 2 {
+        None
+    } else {
+        Some(request_ref(&root, &target[0])?)
+    };
     let request_file = if target.len() == 2 {
         request::ad_hoc(&target[0], &target[1])
     } else {
@@ -88,7 +100,72 @@ pub fn send_one_with_client(
         &resolve.profiles,
         vars,
     )?;
-    Ok(http::send(client, resolved)?)
+    let exchange = http::send(client, resolved)?;
+    let meta = event_meta(
+        ctx,
+        &root,
+        resolve.env.clone().or(config.default_env.clone()),
+        request_ref,
+    );
+    let event_id = record(&exchange, meta, &config.retention, correlation);
+    Ok(Sent { exchange, event_id })
+}
+
+/// The workspace root, or the current directory when there is no workspace.
+pub fn workspace_root() -> anyhow::Result<PathBuf> {
+    let cwd = std::env::current_dir()?;
+    Ok(workspace::find_root(&cwd).unwrap_or(cwd))
+}
+
+/// Origin of an exchange sent from this process.
+pub fn event_meta(
+    ctx: &Context,
+    root: &Path,
+    env: Option<String>,
+    request_ref: Option<String>,
+) -> EventMeta {
+    EventMeta {
+        source: "cli".to_owned(),
+        actor: ctx.actor.as_str().to_owned(),
+        session_id: None,
+        workspace: Some(root.display().to_string()),
+        env,
+        request_ref,
+    }
+}
+
+/// Store an exchange as a history event. Failure is a warning, not an error,
+/// so the send still succeeds.
+pub fn record(
+    exchange: &http::Exchange,
+    meta: EventMeta,
+    retention: &RetentionOptions,
+    correlation: Option<&str>,
+) -> Option<String> {
+    let result = History::open_default().and_then(|mut history| {
+        let session_id = history.current_session()?.map(|session| session.id);
+        let event = NewHttpEvent {
+            correlation: correlation.map(str::to_owned),
+            ..NewHttpEvent::from_exchange(exchange, EventMeta { session_id, ..meta })
+        };
+        history.record_http(&event, retention)
+    });
+    match result {
+        Ok(id) => Some(id),
+        Err(error) => {
+            output::warn(&format!("history event not recorded: {error}"));
+            None
+        }
+    }
+}
+
+/// The request file path relative to the workspace root, or absolute if it lies outside.
+fn request_ref(root: &Path, path: &str) -> anyhow::Result<String> {
+    let absolute = std::env::current_dir()?.join(path);
+    Ok(absolute.strip_prefix(root).map_or_else(
+        |_| absolute.display().to_string(),
+        |relative| relative.display().to_string(),
+    ))
 }
 
 fn parse_vars(values: &[String]) -> anyhow::Result<BTreeMap<String, String>> {
@@ -103,15 +180,30 @@ fn parse_vars(values: &[String]) -> anyhow::Result<BTreeMap<String, String>> {
         .collect()
 }
 
-pub fn run(ctx: &Context, args: SendArgs) -> anyhow::Result<()> {
-    let exchange = send_one(ctx, &args.target, &args.resolve)?;
+/// Print a sent exchange in the output mode of `ctx`, then fail if it errored.
+pub fn print_sent(ctx: &Context, sent: &Sent) -> anyhow::Result<()> {
     if ctx.is_json {
-        crate::commands::output::print_exchange_json(&exchange)?;
+        output::print_exchange_json(&sent.exchange, sent.event_id.as_deref())?;
     } else {
-        crate::commands::output::print_human(&exchange);
+        output::print_human(&sent.exchange, sent.event_id.as_deref());
     }
-    if let Some(error) = exchange.error {
-        anyhow::bail!("{error}");
+    if let Some(error) = &sent.exchange.error {
+        bail!("{error}");
     }
     Ok(())
+}
+
+pub fn run(ctx: &Context, args: SendArgs) -> anyhow::Result<()> {
+    let tag = args.tag.as_deref().map(|tag| tag.trim_start_matches('#'));
+    if tag.is_some_and(str::is_empty) {
+        bail!("tag must not be empty");
+    }
+    let sent = send_one(ctx, &args.target, &args.resolve)?;
+    if let (Some(tag), Some(id)) = (tag, &sent.event_id) {
+        let tagged = History::open_default().and_then(|history| history.add_tag(id, tag));
+        if let Err(error) = tagged {
+            output::warn(&format!("could not tag #{tag}: {error}"));
+        }
+    }
+    print_sent(ctx, &sent)
 }
