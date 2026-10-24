@@ -85,8 +85,10 @@ app/              SwiftUI macOS app; links kestrl-ffi as an XCFramework
 | History | `list_events(filter)`, `show_event(id)`, `tag_event`, `untag_event`, `set_note`, `diff_events(a, b)` → JSON string |
 | Environments | `resolved_env(root, env)` → `[KeyValue]`, secrets masked |
 | Secrets | `set_secret(name, value)`, `delete_secret(name)`, `secret_status(root)` |
+| Services and logs | `list_services()`, `read_logs(service, since_ms, grep, limit)`, `follow_logs(service, grep, sink) -> LogFollow` with `cancel()` |
+| Database | `db_connections(root)`, `db_query(root, connection, env, sql)`, `db_tables(root, connection, env)`, `db_describe(root, connection, env, table)` |
 
-Errors are one `KestrlError` enum: `File`, `Request`, `Secret`, `History`, `InvalidInput`, each with a `message`. Logs, database and capture functions arrive with their phases.
+Errors are one `KestrlError` enum: `File`, `Request`, `Secret`, `History`, `InvalidInput`, each with a `message`. Capture functions arrive with their phase.
 
 ## Project layout
 
