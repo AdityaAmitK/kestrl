@@ -31,6 +31,5 @@ struct EnvironmentsContentView: View {
         .onChange(of: store.inspectedEnvironment) { _, _ in
             Task { await store.loadResolvedVariables() }
         }
-        .navigationTitle("Environments")
     }
 }

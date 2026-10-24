@@ -24,20 +24,12 @@ struct EventDetailView: View {
                             .font(.body.monospaced())
                             .lineLimit(2)
                     }
-                    Spacer()
-                    if let http {
-                        StatusBadge(status: http.status, error: http.error)
-                    }
                 }
 
                 HStack(spacing: 12) {
                     Text(TimeFormat.absolute(ms: event.ts))
                     ActorLabel(actor: event.actor)
                     Text(event.source)
-                    if let http {
-                        Text("\(http.durationMs) ms")
-                            .monospacedDigit()
-                    }
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -73,6 +65,17 @@ struct EventDetailView: View {
                 .padding(.vertical, 8)
 
                 Divider()
+
+                HStack(spacing: 12) {
+                    StatusBadge(status: http.status, error: http.error)
+                    Text("\(http.durationMs) ms")
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    CopyJSONButton(store: store)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
 
                 ExchangeInspector(
                     headers: http.resHeaders,

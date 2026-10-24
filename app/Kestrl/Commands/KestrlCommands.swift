@@ -6,6 +6,14 @@ struct KestrlCommands: Commands {
 
     var body: some Commands {
         CommandGroup(replacing: .newItem) {
+            Button("New Request") {
+                store.newRequest()
+            }
+            .keyboardShortcut("n", modifiers: .command)
+            .disabled(store.workspace == nil)
+
+            Divider()
+
             Button("Open workspace…") {
                 store.isShowingOpenPanel = true
             }
@@ -14,10 +22,10 @@ struct KestrlCommands: Commands {
 
         CommandMenu("Request") {
             Button("Send") {
-                Task { await store.sendSelectedRequest() }
+                Task { await store.sendCurrentRequest() }
             }
             .keyboardShortcut(.return, modifiers: .command)
-            .disabled(store.selectedRequest == nil || store.isSending)
+            .disabled(!store.canSendRequest)
 
             Divider()
 

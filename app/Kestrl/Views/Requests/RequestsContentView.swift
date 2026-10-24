@@ -32,7 +32,5 @@ struct RequestsContentView: View {
         .onChange(of: store.selectedRequest) { _, _ in
             Task { await store.requestSelectionChanged() }
         }
-        .navigationTitle("Requests")
-        .navigationSplitViewColumnWidth(min: 300, ideal: 420)
     }
 }

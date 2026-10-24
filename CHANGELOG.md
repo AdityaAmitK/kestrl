@@ -28,6 +28,8 @@ All notable changes are documented here. The format follows [Keep a Changelog](h
 - `kestrl-ffi::read_request_file` returns a request as written, with variables unresolved.
 
 ### Changed
+- macOS app: History is a full-width table (Time, Status, Method, Summary, Actor, Source, Tags, Duration) with event detail below it. Request files show their URL template in a top bar with a labeled Send (⌘↩); ad-hoc requests open from File ▸ New Request (⌘N). Responses sit below the request in a resizable split that remembers its position. The toolbar shows the environment name, and Copy JSON moved to the pane it copies.
+- `history --json` events include `method`, `status` and `duration_ms` for HTTP events (null otherwise).
 - `--since` accepts seconds (`30s`) as well as minutes, hours and days.
 - Database queries use PostgreSQL result metadata to report affected rows, decode common date/time, UUID, JSON and numeric types, and support `sslmode=require`.
 - Database query history uses workspace retention settings and records the active session.
