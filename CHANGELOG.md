@@ -6,9 +6,7 @@ All notable changes are documented here. The format follows [Keep a Changelog](h
 
 ### Added
 - Project plan, cargo workspace scaffold, and open-source project files.
-- HTTP request sending, collections, workspace variables, profiles, and Keychain secret management.
-
-### Changed
-- Request-file headers and query params now provide base values that profiles can override.
-- Environment variables from the process are no longer used for request interpolation; missing environments and secrets now report actionable errors.
-- `secret ls` reports referenced secret status in human-readable or JSON output.
+- `kestrl send`, `run`, `envs`, `profiles` and `secret`: request files, environments, variables, profiles, and Keychain secrets masked in all output.
+- History store: events, sessions, tags and notes in SQLite, pruned to the last 7 days or 500 unsaved events; saved (tagged or noted) events are kept.
+- `kestrl history [query] [--by actor] [--tag] [--since 30m|1h|2d] [--session] [--limit]`, `history show <id>`, `history edit <id> [--set-actor] [--note]`; ids may be unique prefixes.
+- `kestrl tag <id> <tag> [--remove]` and `kestrl session start [name]` / `session end`.

@@ -56,6 +56,6 @@ CREATE TABLE tags (
 CREATE INDEX tags_tag ON tags(tag);
 
 CREATE VIRTUAL TABLE events_fts USING fts5(
-  summary, note, url, req_body, res_body,
-  content='', tokenize='unicode61'
+  event_id UNINDEXED, summary, note, url, req_body, res_body,
+  tokenize='unicode61'
 );
