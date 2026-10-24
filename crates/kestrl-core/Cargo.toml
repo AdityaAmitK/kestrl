@@ -18,6 +18,11 @@ directories.workspace = true
 ctrlc.workspace = true
 regex.workspace = true
 urlencoding.workspace = true
+postgres.workspace = true
+postgres-types.workspace = true
+postgres-native-tls.workspace = true
+native-tls.workspace = true
+uuid.workspace = true
 
 [lints]
 workspace = true

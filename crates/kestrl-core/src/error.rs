@@ -50,6 +50,18 @@ pub enum Error {
     NoOpenSession,
     #[error("could not locate the application data directory")]
     NoDataDir,
+    #[error("unknown connection \"{0}\"")]
+    UnknownConnection(String),
+    #[error("connection \"{connection}\" has no entry for env \"{env}\"")]
+    ConnectionEnvironment { connection: String, env: String },
+    #[error("unsupported database connection kind: {0}")]
+    UnsupportedConnectionKind(String),
+    #[error(
+        "connection \"{connection}\" is read-only in env \"{env}\"; add it to allow_writes to permit writes"
+    )]
+    ReadOnlyConnection { connection: String, env: String },
+    #[error("database query failed: {0}")]
+    Database(String),
     /// The requested service has no live log socket.
     #[error("service \"{name}\" is not running — start it with: kestrl up {name} -- <cmd>")]
     ServiceNotRunning { name: String },

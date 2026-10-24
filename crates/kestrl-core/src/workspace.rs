@@ -5,7 +5,10 @@ use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 
+use crate::env::Environment;
 use crate::history::RetentionOptions;
+use crate::secrets::Redactor;
+use crate::vars::Variables;
 use crate::{Error, Result};
 
 #[derive(Debug, Default, Deserialize)]
@@ -24,6 +27,31 @@ pub fn find_root(from: &Path) -> Result<PathBuf> {
         }
     }
     Err(Error::WorkspaceNotFound(from.to_owned()))
+}
+
+/// Load the selected environment and workspace variables for a command.
+pub fn load_variables(root: &Path, env: Option<&str>) -> Result<(String, Variables)> {
+    let config = WorkspaceConfig::load(root)?;
+    let env_name = env
+        .or(config.default_env.as_deref())
+        .unwrap_or("local")
+        .to_owned();
+    let environment = match Environment::load(root, &env_name) {
+        Ok(environment) => environment.vars,
+        Err(Error::Read { source, .. }) if source.kind() == std::io::ErrorKind::NotFound => {
+            BTreeMap::new()
+        }
+        Err(error) => return Err(error),
+    };
+    Ok((
+        env_name,
+        Variables {
+            environment,
+            workspace: config.vars,
+            redactor: Redactor::default(),
+            ..Variables::default()
+        },
+    ))
 }
 
 pub(crate) fn names(dir: &Path) -> Result<Vec<String>> {
