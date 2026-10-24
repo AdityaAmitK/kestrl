@@ -1,13 +1,13 @@
 //! Resolving and recording database queries for CLI and app callers.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::time::Instant;
 
 use super::{ConnectionConfig, ConnectionInfo, QueryOptions, QueryResult, query};
+use crate::Result;
 use crate::history::{EventMeta, History, NewDbEvent, RetentionOptions};
 use crate::secrets::Redactor;
 use crate::workspace::{self, WorkspaceConfig};
-use crate::{Error, Result};
 
 /// History attribution for a database query.
 #[derive(Debug, Clone)]
@@ -30,24 +30,27 @@ pub fn resolve_connection(
     Ok((info, redactor))
 }
 
+/// The outcome of one recorded query.
+#[derive(Debug)]
+pub struct QueryRun {
+    /// Redacted results, or why the query failed. Failed queries are recorded too.
+    pub outcome: Result<QueryResult>,
+    /// Whether the query ran in a read-only transaction.
+    pub is_read_only: bool,
+    /// Why recording to history failed, if it did; the query itself is unaffected.
+    pub history_warning: Option<String>,
+}
+
 /// Run a database query, record it in history, and return redacted results.
-/// A history write failure does not replace the query result, matching CLI behavior.
 pub fn run_query(
     root: &Path,
     connection: &str,
     env: Option<&str>,
     sql: &str,
     meta: DbQueryMeta,
-) -> Result<(Result<QueryResult>, bool, Option<String>)> {
+) -> Result<QueryRun> {
     let workspace_config = WorkspaceConfig::load(root)?;
-    let (info, mut redactor) = resolve_connection(root, connection, env)?;
-    let mut query_variables = workspace::load_variables(root, Some(&info.env))?.1;
-    if let Ok(config) = ConnectionConfig::load(root, connection)
-        && let Some(entry) = config.env.get(&info.env)
-        && let Ok(url) = query_variables.resolve(&entry.url)
-    {
-        redactor.track("connection", &url);
-    }
+    let (info, redactor) = resolve_connection(root, connection, env)?;
     let started = Instant::now();
     let result = query(
         &info,
@@ -79,7 +82,7 @@ pub fn run_query(
     let history_warning = record(event, &workspace_config.retention)
         .err()
         .map(|error| error.to_string());
-    let result = result.map(|mut result| {
+    let outcome = result.map(|mut result| {
         for row in &mut result.rows {
             for value in row {
                 if let serde_json::Value::String(text) = value {
@@ -89,7 +92,11 @@ pub fn run_query(
         }
         result
     });
-    Ok((result, info.is_read_only, history_warning))
+    Ok(QueryRun {
+        outcome,
+        is_read_only: info.is_read_only,
+        history_warning,
+    })
 }
 
 fn record(mut event: NewDbEvent, retention: &RetentionOptions) -> Result<String> {
@@ -114,10 +121,4 @@ pub fn describe(
     let (info, redactor) = resolve_connection(root, connection, env)?;
     let (schema, name) = table.split_once('.').unwrap_or(("public", table));
     super::describe_table(&info, schema, name, &redactor)
-}
-
-/// Find the Kestrl workspace from the current directory.
-pub fn find_workspace() -> Result<PathBuf> {
-    let cwd = std::env::current_dir()?;
-    workspace::find_root(&cwd).map_err(|_| Error::WorkspaceNotFound(cwd))
 }

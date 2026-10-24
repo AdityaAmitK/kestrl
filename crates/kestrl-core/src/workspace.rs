@@ -20,6 +20,11 @@ pub struct WorkspaceConfig {
     pub retention: RetentionOptions,
 }
 
+/// The workspace containing the current directory.
+pub fn find_current() -> Result<PathBuf> {
+    find_root(&std::env::current_dir()?)
+}
+
 pub fn find_root(from: &Path) -> Result<PathBuf> {
     for path in from.ancestors() {
         if path.join(".kestrl").is_dir() {

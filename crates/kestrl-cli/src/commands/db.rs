@@ -43,7 +43,7 @@ pub enum DbCommand {
 pub fn run(ctx: &Context, args: DbArgs) -> anyhow::Result<()> {
     match args.command {
         DbCommand::Connections => {
-            let root = kestrl_core::db::run::find_workspace()?;
+            let root = kestrl_core::workspace::find_current()?;
             let names = ConnectionConfig::names(&root)?;
             if ctx.is_json {
                 writeln!(
@@ -78,21 +78,21 @@ fn query_command(
     sql: &str,
     env: Option<&str>,
 ) -> anyhow::Result<()> {
-    let root = kestrl_core::db::run::find_workspace()?;
-    let (result, _, warning) = kestrl_core::db::run::run_query(
+    let root = kestrl_core::workspace::find_current()?;
+    let run = kestrl_core::db::run_query(
         &root,
         connection,
         env,
         sql,
-        kestrl_core::db::run::DbQueryMeta {
+        kestrl_core::db::DbQueryMeta {
             source: "cli".to_owned(),
             actor: ctx.actor.as_str().to_owned(),
         },
     )?;
-    if let Some(error) = warning {
+    if let Some(error) = run.history_warning {
         crate::commands::output::warn(&format!("could not record database query: {error}"));
     }
-    let result = result?;
+    let result = run.outcome?;
     if ctx.is_json {
         let output = serde_json::json!({
             "columns": result.columns,
@@ -117,7 +117,7 @@ fn tables_command(
     env: Option<&str>,
     table: Option<&str>,
 ) -> anyhow::Result<()> {
-    let root = kestrl_core::db::run::find_workspace()?;
+    let root = kestrl_core::workspace::find_current()?;
     if let Some(table) = table {
         let columns = kestrl_core::db::run::describe(&root, connection, env, table)?;
         if ctx.is_json {

@@ -44,7 +44,7 @@ pub fn db_query(
     env: Option<String>,
     sql: String,
 ) -> Result<QueryResultRecord, KestrlError> {
-    let (result, is_read_only, warning) = db::run::run_query(
+    let run = db::run_query(
         Path::new(&workspace_root),
         &connection,
         env.as_deref(),
@@ -54,8 +54,8 @@ pub fn db_query(
             actor: "me".to_owned(),
         },
     )?;
-    let _ = warning;
-    let result = result?;
+    let is_read_only = run.is_read_only;
+    let result = run.outcome?;
     let rows = result
         .rows
         .into_iter()
