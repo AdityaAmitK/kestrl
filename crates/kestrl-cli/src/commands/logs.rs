@@ -122,7 +122,12 @@ pub fn run(context: &Context, args: LogsArgs) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn write_log_line(stdout: &mut impl Write, is_json: bool, offset: time::UtcOffset, line: &LogLine) -> io::Result<()> {
+fn write_log_line(
+    stdout: &mut impl Write,
+    is_json: bool,
+    offset: time::UtcOffset,
+    line: &LogLine,
+) -> io::Result<()> {
     if is_json {
         writeln!(stdout, "{}", serde_json::to_string(line)?)
     } else {

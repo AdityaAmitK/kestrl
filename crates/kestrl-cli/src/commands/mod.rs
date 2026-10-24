@@ -1,16 +1,20 @@
 //! One module per subcommand. Each exposes `<Name>Args` and `run`.
 
 pub mod capture;
+pub mod db;
 pub mod envs;
 pub mod history;
+pub mod logs;
 pub mod output;
 pub mod profiles;
 pub mod proxy;
+pub mod ps;
 pub mod run;
 pub mod secret;
 pub mod send;
 pub mod session;
 pub mod tag;
+pub mod up;
 
 use clap::Args;
 use clap::Subcommand;
@@ -29,7 +33,7 @@ pub enum Command {
     Profiles(profiles::ProfilesArgs),
     /// Manage secrets in the macOS Keychain
     Secret(secret::SecretArgs),
-    /// Capture traffic from a simulator or emulator
+    /// Capture traffic from a simulator, emulator or browser
     Capture(capture::CaptureArgs),
     /// Manage capture proxy trust and system settings
     Proxy(proxy::ProxyArgs),
@@ -39,6 +43,14 @@ pub enum Command {
     Tag(tag::TagArgs),
     /// Start or end a session
     Session(session::SessionArgs),
+    /// Query databases and browse tables
+    Db(db::DbArgs),
+    /// Start a service through Kestrl so its logs are collected
+    Up(up::UpArgs),
+    /// List running services and their ports
+    Ps(ps::PsArgs),
+    /// Tail or follow a service's live buffer
+    Logs(logs::LogsArgs),
 }
 
 /// Flags shared by commands that resolve variables and profiles.
@@ -67,5 +79,9 @@ pub fn dispatch(ctx: &Context, command: Command) -> anyhow::Result<()> {
         Command::History(args) => history::run(ctx, args),
         Command::Tag(args) => tag::run(ctx, args),
         Command::Session(args) => session::run(ctx, args),
+        Command::Db(args) => db::run(ctx, args),
+        Command::Up(args) => up::run(ctx, args),
+        Command::Ps(args) => ps::run(ctx, args),
+        Command::Logs(args) => logs::run(ctx, args),
     }
 }
