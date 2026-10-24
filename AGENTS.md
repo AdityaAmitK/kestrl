@@ -1,6 +1,6 @@
 # Kestrl — agent conventions
 
-Read `PLAN.md` first. These rules are binding for every contributor (human or agent).
+Read `PLAN.md` first. Use its glossary terms exactly in code, CLI help and docs. These rules are binding for every contributor (human or agent).
 
 ## Workflow
 - One feature = one branch (`feat/<name>`, `fix/<name>`) → PR to `main` → review → squash-merge.
@@ -18,3 +18,7 @@ Read `PLAN.md` first. These rules are binding for every contributor (human or ag
 
 ## GUI (phase 5)
 - SwiftUI over `kestrl-ffi` (UniFFI). Apply the `apple-design` and `frontend-design` skills: native controls, semantic colors, light/dark, keyboard shortcuts, accessibility first.
+
+## Open source hygiene
+- Never commit secrets or real credentials, including in fixtures and examples. CI runs gitleaks.
+- Update `CHANGELOG.md` (Unreleased) and `PLAN.md` when behavior or the CLI surface changes.

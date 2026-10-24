@@ -1,30 +1,87 @@
 # Kestrl Plan
 
-A fast local workbench for backend development, built for me and for AI agents (Cursor, Claude Code, Codex). It covers what I use Postman/Bruno, Proxyman, TablePlus and terminal logs for today. Every feature has a GUI and a CLI, and both work on the same data.
+A fast, local-first workbench for backend development, built for developers and AI agents (Cursor, Claude Code, Codex). One tool instead of an API client, a traffic inspector, a database GUI and scattered terminal logs. Every feature has a **CLI** and a **GUI**, and both work on the same data. Agents use the CLI instead of curl.
+
+## Non-goals
+
+- **No accounts, no cloud sync, no hosted backend.** Kestrl stays local and light. Sharing happens through git (request files) and Copy JSON.
+- No telemetry.
+- No Postman-style workspace bloat. Postman collection import may come later.
+
+## Glossary
+
+Each term means one thing and is used the same way in code, the CLI and the docs.
+
+### Actions
+
+| Term | Meaning | Command |
+|---|---|---|
+| **Send** | You make one API request and get the response | `kestrl send` |
+| **Run** | Send every request in a collection, in order | `kestrl run <dir>` |
+| **Replay** | Send a past request again exactly as it was | `kestrl history replay <id>` |
+| **Capture** | Kestrl observes traffic that something else makes | `kestrl capture …` |
+| **Up** | Start a service through Kestrl so its logs are collected | `kestrl up` |
+| **Attach** | Follow logs of a service Kestrl did not start (file or Docker) | `kestrl logs attach` |
+| **Tail** | Read or follow a service's logs | `kestrl logs <service>` |
+| **Query** | Run SQL against a database connection | `kestrl db query` |
+| **Browse** | Look through database tables | GUI |
+
+**Send vs capture:** *send* means you make the request; *capture* means you watch requests others make. The word "watch" is not used.
+
+### Capture kinds
+
+| Term | Observes | Command |
+|---|---|---|
+| **Device capture** | iOS Simulator and Android emulator traffic (HTTP and HTTPS) through Kestrl's proxy | `kestrl capture sim` / `kestrl capture android` |
+| **Browser capture** | A separate browser window that Kestrl opens (Chrome DevTools Protocol) | `kestrl capture browser` |
+| **Port capture** | Live plain-HTTP traffic on a local port, e.g. a server already running on 1337 | `kestrl capture port 1337` |
+
+### Data
+
+| Term | Meaning | Lives in |
+|---|---|---|
+| **Request file** | One saved request (`*.req.toml`) | Git |
+| **Collection** | A folder of request files | Git |
+| **Environment** | A named set of variables (`local`, `prod`) | Git |
+| **Variable** | `{{api_url}}`, with a value per environment | Git |
+| **Secret** | A variable whose value lives in the Keychain: `{{secret:name}}` | Keychain |
+| **Profile** | A reusable add-on of headers and query params, optionally conditional (`admin`) | Git |
+| **Connection** | A database, with host per environment and credentials in the Keychain | Git + Keychain |
+| **Service** | A named process Kestrl runs or follows (`api`), with its port and PID | Memory |
+| **Live buffer** | Temporary in-memory data: logs and captures | Memory |
+| **History** | Requests and queries you ran, auto-pruned | SQLite |
+| **Event** | One history entry | SQLite |
+| **Saved** | A tagged or noted event, kept until deleted | SQLite |
+| **Tag** | A label on an event (`#login-bug`) | SQLite |
+| **Session** | A group of events from one working stretch | SQLite |
+| **Actor** | Who did it: `me`, `cursor`, `claude-code`, `codex` | SQLite |
+| **Timeline** | Requests, logs and queries from the same moment, shown together | View |
 
 ## Architecture
 
 ```
 crates/
-  kestrl-core   Rust library: requests, envs, secrets, history, (later) logs, db, proxy
-  kestrl-cli    `kestrl` binary (clap) over kestrl-core
-  kestrl-ffi    (phase 5) UniFFI bindings for the Swift app
-app/            (phase 5) SwiftUI macOS app; links kestrl-ffi as an XCFramework
+  kestrl-core     Library: requests, variables, profiles, secrets, history, logs, db, capture
+  kestrl-cli      `kestrl` binary (clap) over kestrl-core
+  kestrl-ffi      UniFFI bindings for the Swift app
+app/              SwiftUI macOS app; links kestrl-ffi as an XCFramework
 ```
 
-- **GUI: SwiftUI over the Rust core via UniFFI** (decided). The core has no GUI code; everything the app needs goes through `kestrl-ffi`.
-- **One store:** SQLite at `~/Library/Application Support/kestrl/history.db` (WAL, so the app and CLI can use it at the same time). Project files (requests, envs) live in the repo under `.kestrl/`.
-- **Secrets:** macOS Keychain (service `kestrl`). Written as `{{secret:name}}`, filled in only at send time, and replaced with `••••••` before anything is printed or saved.
-- **Output:** human-readable on a TTY. JSON when stdout is not a TTY, or when `--json` is passed.
-- **Speed:** sync code where possible, with tokio only around reqwest. rustls, a thin-LTO release build, and no daemon in phase 1.
+- **GUI:** SwiftUI over the Rust core via UniFFI. The core contains no GUI code.
+- **Store:** SQLite at `~/Library/Application Support/kestrl/history.db` in WAL mode, so the app and CLI can use it at the same time. Project files live in the repo under `.kestrl/`.
+- **Secrets:** macOS Keychain (service `kestrl`). Filled in only at send time and replaced with `••••••` before anything is printed or stored.
+- **Output:** human-readable on a TTY; JSON when stdout is not a TTY or with `--json`.
+- **Speed:** sync where possible, tokio only around network I/O, rustls, thin-LTO release builds, no daemon.
 
-## Project layout (git-friendly)
+## Project layout
 
 ```
 .kestrl/
-  kestrl.toml            # workspace config (default env, name)
+  kestrl.toml              # workspace config: default env, retention
   envs/local.toml
-  envs/staging.toml
+  envs/prod.toml
+  profiles/admin.toml
+  connections/main.toml
 requests/
   auth/login.req.toml
 ```
@@ -32,15 +89,16 @@ requests/
 `envs/local.toml`
 ```toml
 [vars]
-base_url = "http://localhost:3000"
+api_url = "http://localhost:3000"
 token = "{{secret:local_token}}"
 ```
 
-`login.req.toml`
+`requests/auth/login.req.toml`
 ```toml
 name = "Login"
 method = "POST"
-url = "{{base_url}}/auth/login"
+url = "{{api_url}}/auth/login"
+profiles = ["admin"]          # optional
 
 [headers]
 Authorization = "Bearer {{token}}"
@@ -50,42 +108,98 @@ type = "json"
 content = '''{ "email": "a@b.c" }'''
 ```
 
-Variables resolve in this order: CLI `--var k=v` > env file > workspace config. Secrets resolve last.
+`profiles/admin.toml`
+```toml
+[headers]
+X-Admin-Token = "{{secret:admin_token}}"
+
+[query]
+debug = "1"
+
+[when]                        # optional: apply automatically when every condition matches
+env = ["local", "staging"]
+url = "*/dev/*"
+```
+
+`connections/main.toml`
+```toml
+kind = "postgres"
+allow_writes = ["local"]      # read-only everywhere else
+
+[env.local]
+url = "postgres://{{secret:db_local_user}}:{{secret:db_local_pass}}@localhost:5432/app"
+```
+
+**Resolution order:** `--var k=v` > environment > workspace config. Profiles apply in this order: those listed in the request file, then `-p` flags, then profiles whose `when` matches. Later values override earlier ones. Secrets resolve last.
+
+## Retention
+
+| Data | Kept |
+|---|---|
+| Service logs | Memory only, rolling buffer (~10k lines per service), gone when the service stops |
+| Captures | Memory only while capturing; save one to history explicitly |
+| Sent requests and queries | Disk, pruned to the last 7 days or 500 events, whichever comes first |
+| Saved events (tagged or noted) | Until deleted |
+| Bodies | Cut to 1 MB when stored |
+
+All limits are configurable in `.kestrl/kestrl.toml` under `[retention]`.
 
 ## History schema
 
-The source of truth is `crates/kestrl-core/migrations/0001_init.sql`.
+The source of truth is `crates/kestrl-core/migrations/`.
 
-- `sessions(id, name, actor, started_at, ended_at)`: groups the events from one working session.
-- `events(id ULID, ts, kind http|log|db, source app|cli|simulator, actor, session_id, workspace, env, request_ref, correlation, summary, note)`: one row per recorded thing. Request, log and DB events link to each other through `correlation`.
-- `http_exchanges(event_id, method, url, headers, bodies, status, duration_ms, error, redacted)`: stored *after* secrets are masked.
+- `sessions(id, name, actor, started_at, ended_at)`
+- `events(id ULID, ts, kind http|db|capture, source app|cli|simulator|browser|port, actor, session_id, workspace, env, request_ref, correlation, summary, note)`
+- `http_exchanges(event_id, method, url, headers, bodies, status, duration_ms, error, redacted)`, stored after masking
+- `db_queries(event_id, connection, sql, rows, duration_ms, error)`
 - `tags(event_id, tag)`
-- `events_fts`: FTS5 index over summary, note, url and bodies.
-- Phases 2 and 3 add `log_lines` and `db_queries` tables, also keyed by `event_id`.
+- `events_fts`: FTS5 index over summary, note, url and bodies
 
-**Actor:** `--actor`, then `KESTRL_ACTOR`, then env-var detection (`CLAUDECODE`, `CODEX_*`, `CURSOR_*`), then the parent process chain, then `me`. The actor can be changed later with `kestrl history edit`.
+**Actor:** `--actor`, then `KESTRL_ACTOR`, then agent env vars (`CLAUDECODE`, `CODEX_*`, `CURSOR_*`), then the parent process chain, then `me`. Editable later.
 
-## CLI surface (phase 1)
+## CLI surface
 
 ```
-kestrl send <file|METHOD URL> [-e env] [--var k=v] [--actor a] [--tag t] [--json]
-kestrl run <dir> [-e env]                 # run every request in the folder, print a summary
-kestrl envs [name]                        # list envs / show resolved vars (secrets masked)
-kestrl secret set|rm|ls <name>            # `set` reads the value from stdin/prompt
+# Requests
+kestrl send <file|METHOD URL> [-e env] [-p profile]... [--var k=v]... [--tag t] [--json]
+kestrl run <dir> [-e env] [-p profile]...
+kestrl envs [name]                         # list, or show resolved vars (secrets masked)
+kestrl profiles [name]
+kestrl secret set|rm|ls [name]             # `set` reads the value from stdin or a prompt
+
+# History
 kestrl history [query] [--actor a] [--tag t] [--since 1h] [--session id] [--limit n]
-kestrl history show <id> | replay <id> | diff <a> <b> | edit <id> --actor/--note
-kestrl tag <id> <#tag> [--note text]
+kestrl history show|replay <id>
+kestrl history diff <a> <b>
+kestrl history edit <id> [--actor a] [--note text]
+kestrl tag <id> <tag>
 kestrl session start [name] | end
+
+# Services and logs
+kestrl up <service> -- <cmd...>
+kestrl ps
+kestrl logs <service> [-f] [--since 2m] [--grep re] [--json]
+kestrl logs attach <service> --file <path> | --docker <container>
+
+# Database
+kestrl db query <connection> "<sql>" [-e env] [--json]
+kestrl db tables <connection> [-e env]
+
+# Capture
+kestrl capture sim|android|browser [--save]
+kestrl capture port <port> [--save]
+kestrl proxy trust                          # install the Kestrl root certificate
 ```
 
-`send` JSON output:
-`{ id, status, ms, headers, body, redacted: ["local_token"] }`
+`send` JSON output: `{ id, status, ms, headers, body, redacted: ["local_token"] }`
 
 ## Phases
 
-1. **Core + CLI:** workspace, history store and migrations, envs, request files, Keychain secrets and masking, `send/run/envs/secret/history/tag/session`.
-2. **Logs:** `kestrl up -- <cmd>` captures stdout and stderr into a ring buffer plus SQLite; `kestrl logs <name> --since --grep --json`.
-3. **DB:** Postgres connections per env, with creds in Keychain. `kestrl db query`, read-only by default, writes only when the env opts in. Queries are recorded in history.
-4. **Proxy:** HTTP/HTTPS MITM for the iOS Simulator and Android emulator, with cert setup helpers. Captured traffic goes into history.
-5. **GUI:** `kestrl-ffi` plus the SwiftUI app: request editor, history and timeline, log viewer, DB console.
-6. **Types:** schema inference from history, OpenAPI/JSON Schema import, validation, drift detection, codegen.
+1. **Requests and history:** variables, environments, Keychain secrets and masking, profiles, `send`, `run`, history store and retention, `history`, `tag`, `session`.
+2. **Services and logs:** `up`, `ps`, `logs` (tail, grep, follow), `attach`. In-memory buffers, with port detection per service.
+3. **Database:** Postgres connections per environment, read-only by default, `db query` and `db tables`. Queries recorded in history.
+4. **Capture:** an HTTPS interception proxy with its own root certificate, device capture (iOS Simulator, Android emulator), browser capture (CDP), and port capture (plain HTTP on loopback). The system proxy must be restored on exit, and again on the next start after a crash.
+5. **GUI:** `kestrl-ffi` and the SwiftUI app: request editor, environment picker, history and timeline, log viewer, DB console, live capture, Copy JSON everywhere.
+6. **Types (later):** schema inference from history, OpenAPI and JSON Schema import, validation, drift detection, type export.
+
+**Later:** Postman collection import, physical-device capture over Wi-Fi.
