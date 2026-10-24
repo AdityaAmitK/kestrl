@@ -58,6 +58,11 @@ final class WorkspaceStore {
         workspace != nil && !isSending && !adHocURL.trimmingCharacters(in: .whitespaces).isEmpty
     }
 
+    /// Whether ⌘↩ and the Send buttons can send: the open request file, or the ad-hoc URL when none is open.
+    var canSendRequest: Bool {
+        section == .requests && (selectedRequest != nil ? workspace != nil && !isSending : canSendAdHoc)
+    }
+
     var hasShownExchange: Bool {
         switch section {
         case .requests: return response != nil
@@ -167,6 +172,23 @@ final class WorkspaceStore {
         await perform(requestPath: path) {
             try sendRequestFile(workspaceRoot: root, path: path, env: env, profiles: [], vars: [])
         }
+    }
+
+    /// Sends the open request file, or the ad-hoc URL when none is open.
+    func sendCurrentRequest() async {
+        if selectedRequest != nil {
+            await sendSelectedRequest()
+        } else {
+            await sendAdHocRequest()
+        }
+    }
+
+    /// Opens an empty ad-hoc bar in the Requests section.
+    func newRequest() {
+        section = .requests
+        selectedRequest = nil
+        adHocURL = ""
+        response = nil
     }
 
     func sendAdHocRequest() async {

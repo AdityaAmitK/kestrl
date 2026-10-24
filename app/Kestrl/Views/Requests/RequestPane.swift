@@ -1,60 +1,61 @@
 import SwiftUI
 
-/// The request as written in its file, with variables unresolved, and the Send button.
+/// The open request as its file defines it, with variables unresolved: params, headers or body.
 struct RequestPane: View {
     let store: WorkspaceStore
     let detail: RequestDetail
 
+    @State private var part: Part = .params
+
+    private enum Part: String, CaseIterable, Identifiable {
+        case params = "Params"
+        case headers = "Headers"
+        case body = "Body"
+
+        var id: Self { self }
+    }
+
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                HStack(alignment: .firstTextBaseline, spacing: 12) {
-                    MethodBadge(method: detail.method)
-                    Text(detail.name ?? store.selectedRequest ?? "")
-                        .font(.title3.weight(.semibold))
-                        .lineLimit(1)
-                    Spacer()
-                    Button {
-                        Task { await store.sendSelectedRequest() }
-                    } label: {
-                        Label(store.isSending ? "Sending…" : "Send", systemImage: "paperplane.fill")
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(store.isSending)
-                    .help("Send the request (⌘↩)")
-                }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(detail.url)
-                        .font(.body.monospaced())
-                        .textSelection(.enabled)
-                    Text(store.selectedRequest ?? "")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
-                }
-
-                if !detail.profiles.isEmpty {
-                    Label(detail.profiles.joined(separator: ", "), systemImage: "square.stack.3d.up")
-                        .foregroundStyle(.secondary)
-                }
-
-                KeyValueGrid(title: "Query", pairs: detail.query)
-                KeyValueGrid(title: "Headers", pairs: detail.headers)
-
-                if let body = store.requestBody {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Body")
-                            .font(.headline)
-                        JSONTextView(text: body.text)
-                            .frame(minHeight: 120, maxHeight: 220)
-                            .clipShape(RoundedRectangle(cornerRadius: 6))
-                            .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(.separator))
-                    }
+        VStack(alignment: .leading, spacing: 0) {
+            Picker("Show", selection: $part) {
+                ForEach(Part.allCases) { option in
+                    Text(option.rawValue).tag(option)
                 }
             }
-            .padding(20)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .fixedSize()
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+
+            switch part {
+            case .params:
+                keyValues(detail.query, empty: "This request has no params.")
+            case .headers:
+                keyValues(detail.headers, empty: "This request has no headers.")
+            case .body:
+                bodyContent
+            }
+        }
+    }
+
+    @ViewBuilder private func keyValues(_ pairs: [KeyValue], empty: String) -> some View {
+        if pairs.isEmpty {
+            ContentUnavailableView("Nothing here", systemImage: "list.bullet", description: Text(empty))
+        } else {
+            ScrollView {
+                KeyValueGrid(title: part.rawValue, pairs: pairs)
+                    .padding(16)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+
+    @ViewBuilder private var bodyContent: some View {
+        if let body = store.requestBody {
+            JSONTextView(text: body.text)
+        } else {
+            ContentUnavailableView("No body", systemImage: "doc", description: Text("This request sends no body."))
         }
     }
 }

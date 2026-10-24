@@ -30,6 +30,5 @@ struct SecretsContentView: View {
                 )
             }
         }
-        .navigationTitle("Secrets")
     }
 }

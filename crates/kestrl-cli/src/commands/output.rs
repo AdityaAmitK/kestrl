@@ -2,6 +2,7 @@
 
 use std::io::Write;
 
+use kestrl_core::capture::CapturedExchange;
 use kestrl_core::http::Exchange;
 use time::{OffsetDateTime, UtcOffset};
 
@@ -43,6 +44,32 @@ pub fn print_json(value: &serde_json::Value) -> anyhow::Result<()> {
 /// Print a warning on stderr; the command itself still succeeds.
 pub fn warn(message: &str) {
     let _ = writeln!(std::io::stderr(), "warning: {message}");
+}
+
+/// Print one live capture line using the CLI's local timestamp offset.
+pub fn print_capture_line(exchange: &CapturedExchange, offset: UtcOffset) {
+    let path = exchange
+        .url
+        .split_once("://")
+        .map_or(exchange.url.as_str(), |(_, rest)| rest);
+    let status = if exchange.tunneled {
+        "-".to_owned()
+    } else {
+        exchange
+            .status
+            .map_or_else(|| "-".to_owned(), |value| value.to_string())
+    };
+    let tunnel = if exchange.tunneled { "  tunneled" } else { "" };
+    let _ = writeln!(
+        std::io::stdout().lock(),
+        "{}  {} {}  {}ms  {}{}",
+        clock(exchange.ts, offset),
+        exchange.method,
+        status,
+        exchange.duration_ms,
+        path,
+        tunnel
+    );
 }
 
 pub fn exchange_json(exchange: &Exchange, event_id: Option<&str>) -> serde_json::Value {

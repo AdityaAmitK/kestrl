@@ -32,7 +32,7 @@ struct ResponseView: View {
                 CopyJSONButton(store: store)
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 10)
+            .padding(.vertical, 12)
 
             Divider()
 

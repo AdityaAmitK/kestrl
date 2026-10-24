@@ -32,6 +32,12 @@ pub struct EventSummary {
     pub env: Option<String>,
     pub summary: String,
     pub tags: Vec<String>,
+    /// HTTP events only
+    pub method: Option<String>,
+    /// HTTP events only; unset when the request failed before a response
+    pub status: Option<u16>,
+    /// HTTP events only
+    pub duration_ms: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -61,7 +67,10 @@ pub struct HttpExchange {
 }
 
 const SUMMARY_COLUMNS: &str = "e.id, e.ts, e.kind, e.source, e.actor, e.env, e.summary,
-    (SELECT json_group_array(t.tag) FROM tags t WHERE t.event_id = e.id)";
+    (SELECT json_group_array(t.tag) FROM tags t WHERE t.event_id = e.id),
+    (SELECT h.method FROM http_exchanges h WHERE h.event_id = e.id),
+    (SELECT h.status FROM http_exchanges h WHERE h.event_id = e.id),
+    (SELECT h.duration_ms FROM http_exchanges h WHERE h.event_id = e.id)";
 
 impl History {
     pub fn list(&self, filter: &HistoryFilter) -> Result<Vec<EventSummary>> {
@@ -100,11 +109,11 @@ impl History {
         let detail = self.conn.query_row(&sql, params![id], |row| {
             Ok(EventDetail {
                 event: summary_row(row)?,
-                session_id: row.get(8)?,
-                workspace: row.get(9)?,
-                request_ref: row.get(10)?,
-                correlation: row.get(11)?,
-                note: row.get(12)?,
+                session_id: row.get(11)?,
+                workspace: row.get(12)?,
+                request_ref: row.get(13)?,
+                correlation: row.get(14)?,
+                note: row.get(15)?,
                 http: None,
             })
         })?;
@@ -160,6 +169,9 @@ fn summary_row(row: &Row) -> rusqlite::Result<EventSummary> {
         env: row.get(5)?,
         summary: row.get(6)?,
         tags: json_column(row, 7)?,
+        method: row.get(8)?,
+        status: row.get(9)?,
+        duration_ms: row.get(10)?,
     })
 }
 
