@@ -1,0 +1,19 @@
+[package]
+name = "kestrl-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "kestrl"
+path = "src/main.rs"
+
+[dependencies]
+kestrl-core.workspace = true
+anyhow.workspace = true
+serde_json.workspace = true
+clap.workspace = true
+tokio.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,38 @@
+[workspace]
+resolver = "2"
+members = ["crates/kestrl-core", "crates/kestrl-cli"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/AdityaAmitK/kestrl"
+
+[workspace.dependencies]
+kestrl-core = { path = "crates/kestrl-core" }
+anyhow = "1"
+thiserror = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+clap = { version = "4", features = ["derive", "env"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "gzip", "brotli", "json"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+rusqlite = { version = "0.32", features = ["bundled", "serde_json"] }
+keyring = { version = "3", features = ["apple-native"] }
+ulid = "1"
+time = { version = "0.3", features = ["serde", "formatting", "parsing"] }
+directories = "5"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+print_stdout = "warn"
