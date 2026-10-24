@@ -2,6 +2,7 @@
 //! SwiftUI app via UniFFI.
 
 pub mod actor;
+pub mod capture;
 pub mod env;
 pub mod error;
 pub mod history;

@@ -50,4 +50,6 @@ pub enum Error {
     NoOpenSession,
     #[error("could not locate the application data directory")]
     NoDataDir,
+    #[error("capture failed: {0}")]
+    Capture(String),
 }

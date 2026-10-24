@@ -16,6 +16,13 @@ ulid.workspace = true
 time.workspace = true
 directories.workspace = true
 urlencoding.workspace = true
+hudsucker.workspace = true
+rcgen.workspace = true
+tokio.workspace = true
+http-body-util.workspace = true
+bytes.workspace = true
+flate2.workspace = true
+brotli.workspace = true
 
 [lints]
 workspace = true

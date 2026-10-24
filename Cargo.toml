@@ -24,6 +24,13 @@ time = { version = "0.3", features = ["serde", "formatting", "parsing"] }
 directories = "5"
 urlencoding = "2"
 rpassword = "7"
+hudsucker = { version = "0.25", default-features = false, features = ["rcgen-ca", "rustls-client"] }
+rcgen = "0.14"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal"] }
+http-body-util = "0.1"
+bytes = "1"
+flate2 = "1"
+brotli = "9"
 
 [profile.release]
 lto = "thin"

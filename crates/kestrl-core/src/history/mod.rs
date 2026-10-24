@@ -6,6 +6,7 @@
 mod edit;
 mod query;
 mod record;
+mod record_capture;
 mod retention;
 mod session;
 
@@ -19,6 +20,7 @@ use crate::{Error, Result};
 
 pub use query::{EventDetail, EventSummary, HistoryFilter, HttpExchange};
 pub use record::NewHttpEvent;
+pub use record_capture::NewCapture;
 pub use retention::RetentionOptions;
 pub use session::Session;
 
