@@ -3,6 +3,7 @@
 //! `record` writes events, `query` reads them, `edit` changes saved ones,
 //! `retention` prunes unsaved ones and `session` groups events.
 
+mod diff;
 mod edit;
 mod query;
 mod record;
@@ -17,8 +18,9 @@ use rusqlite::Connection;
 
 use crate::{Error, Result};
 
+pub use diff::{BodyDiff, EventDiff, HeaderChange, HeaderDiff, JsonChange, LineOp, diff_exchanges};
 pub use query::{EventDetail, EventSummary, HistoryFilter, HttpExchange};
-pub use record::NewHttpEvent;
+pub use record::{EventMeta, NewHttpEvent};
 pub use retention::RetentionOptions;
 pub use session::Session;
 
