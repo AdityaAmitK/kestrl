@@ -6,19 +6,7 @@ struct RequestsContentView: View {
 
     var body: some View {
         List(selection: $store.selectedRequest) {
-            OutlineGroup(store.requestTree, children: \.children) { node in
-                if let request = node.request {
-                    HStack(spacing: 8) {
-                        MethodBadge(method: request.method ?? "?")
-                        Text(node.name)
-                            .lineLimit(1)
-                    }
-                    .tag(request.path)
-                } else {
-                    Label(node.name, systemImage: "folder")
-                        .foregroundStyle(.secondary)
-                }
-            }
+            RequestTreeRows(nodes: store.requestTree, store: store)
         }
         .overlay {
             if store.requestTree.isEmpty {

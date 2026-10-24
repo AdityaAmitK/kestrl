@@ -2,6 +2,8 @@
 enum SidebarSection: String, CaseIterable, Identifiable, Hashable {
     case requests
     case history
+    case logs
+    case database
     case environments
     case secrets
 
@@ -11,6 +13,8 @@ enum SidebarSection: String, CaseIterable, Identifiable, Hashable {
         switch self {
         case .requests: return "Requests"
         case .history: return "History"
+        case .logs: return "Logs"
+        case .database: return "Database"
         case .environments: return "Environments"
         case .secrets: return "Secrets"
         }
@@ -20,6 +24,8 @@ enum SidebarSection: String, CaseIterable, Identifiable, Hashable {
         switch self {
         case .requests: return "doc.text"
         case .history: return "clock.arrow.circlepath"
+        case .logs: return "text.alignleft"
+        case .database: return "cylinder.split.1x2"
         case .environments: return "globe"
         case .secrets: return "key"
         }

@@ -53,6 +53,9 @@ struct ContentView: View {
         .task(id: store.section) {
             await store.sectionChanged()
         }
+        .onChange(of: store.selectedEnvironment) { _, _ in
+            Task { await store.environmentChanged() }
+        }
     }
 
     private var workspaceName: String {
@@ -62,7 +65,13 @@ struct ContentView: View {
     @ViewBuilder private var sectionView: some View {
         switch store.section {
         case .requests:
-            AutosavingSplit(autosaveName: "kestrl.requests.list", axis: .horizontal, defaultFraction: 0.3) {
+            // A new autosave name drops the old 45% divider that people may have dragged out earlier.
+            AutosavingSplit(
+                autosaveName: "kestrl.requests.list.v2",
+                axis: .horizontal,
+                defaultFraction: 0.25,
+                firstPaneMinimum: 220
+            ) {
                 RequestsContentView(store: store)
             } second: {
                 RequestsDetailView(store: store)
@@ -72,6 +81,18 @@ struct ContentView: View {
                 HistoryContentView(store: store)
             } second: {
                 HistoryDetailView(store: store)
+            }
+        case .logs:
+            AutosavingSplit(autosaveName: "kestrl.logs.services", axis: .horizontal, defaultFraction: 0.3) {
+                LogsContentView(store: store)
+            } second: {
+                LogsDetailView(store: store)
+            }
+        case .database:
+            AutosavingSplit(autosaveName: "kestrl.database.list", axis: .horizontal, defaultFraction: 0.3) {
+                DatabaseContentView(store: store)
+            } second: {
+                DatabaseDetailView(store: store)
             }
         case .environments:
             AutosavingSplit(autosaveName: "kestrl.environments.list", axis: .horizontal, defaultFraction: 0.35) {
@@ -89,7 +110,7 @@ struct ContentView: View {
     }
 
     @ToolbarContentBuilder private var toolbarItems: some ToolbarContent {
-        if store.section == .requests {
+        if store.section == .requests || store.section == .database {
             ToolbarItem {
                 EnvironmentMenu(store: store)
             }

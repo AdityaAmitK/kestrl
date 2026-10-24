@@ -26,6 +26,25 @@ final class WorkspaceStore {
     private(set) var isSending = false
     private(set) var justCopied = false
     private(set) var errorMessage: String?
+    /// Folders the user collapsed in the request tree. Folders are expanded unless listed here.
+    private(set) var collapsedFolders: Set<String> = []
+
+    private(set) var services: [ServiceInfo] = []
+    /// The newest `logCapacity` lines of the selected service, oldest first
+    private(set) var logLines: [LogLine] = []
+    /// Why the stream stopped, when it did
+    private(set) var logStatus: String?
+    /// The filter the stream is running with. nil shows every line.
+    private(set) var logFilter: String?
+    private(set) var logFilterError: String?
+
+    private(set) var connections: [String] = []
+    /// Tables of each expanded connection, keyed by connection name
+    private(set) var tablesByConnection: [String: [TableInfo]] = [:]
+    private(set) var expandedConnections: Set<String> = []
+    private(set) var tableColumns: [ColumnInfo] = []
+    private(set) var queryResult: ShownQueryResult?
+    private(set) var isRunningQuery = false
 
     var section: SidebarSection {
         didSet { defaults.set(section.rawValue, forKey: Self.sectionKey) }
@@ -47,6 +66,19 @@ final class WorkspaceStore {
     var isShowingOpenPanel = false
     var isShowingComparison = false
     var isSettingSecret = false
+    var selectedLogService: String?
+    var selectedLogSeqs: Set<UInt64> = []
+    /// Where a shift-click range starts
+    private var logAnchor: UInt64?
+    /// What the user has typed in the log filter. It applies after a short pause, once it is valid.
+    var logFilterText = ""
+    /// Whether the log view follows new lines. Scrolling up pauses it.
+    var logsFollowing = true
+    var selectedDatabaseItem: DatabaseSelection?
+    var sql = ""
+
+    private var logFilterTask: Task<Void, Never>?
+    private static let logCapacity = 10_000
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -67,12 +99,24 @@ final class WorkspaceStore {
         switch section {
         case .requests: return response != nil
         case .history: return eventDetail?.detail.http != nil
-        case .environments, .secrets: return false
+        case .logs, .database, .environments, .secrets: return false
         }
     }
 
     /// Changes whenever the history filter does, so the history view can restart its refresh loop.
     var historyQueryKey: String { "\(historyActor ?? "")|\(historyText)" }
+
+    /// Changes whenever the service or its filter does, so the log view restarts its stream.
+    var logStreamKey: String { "\(selectedLogService ?? "")|\(logFilter ?? "")" }
+
+    /// The connection the Database section works on: the selected connection, or the one a table belongs to.
+    var selectedConnection: String? { selectedDatabaseItem?.connection }
+
+    /// The table the Database section has selected, if one is
+    var selectedTable: DatabaseTable? {
+        if case .table(let table) = selectedDatabaseItem { return table }
+        return nil
+    }
 
     func dismissError() {
         errorMessage = nil
@@ -100,6 +144,7 @@ final class WorkspaceStore {
                 eventDetail = nil
                 selectedRequest = nil
                 selectedEventIDs = []
+                resetDatabase()
             }
             workspace = info
             requestTree = RequestNode.build(info.requests)
@@ -139,10 +184,23 @@ final class WorkspaceStore {
             await loadResolvedVariables()
         case .secrets:
             await loadSecrets()
+        case .logs:
+            await loadServices()
+        case .database:
+            await loadConnections()
         }
     }
 
     // MARK: Requests
+
+    /// Folders start expanded. Only a folder the user collapsed is remembered.
+    func setFolder(_ id: String, expanded: Bool) {
+        if expanded {
+            collapsedFolders.remove(id)
+        } else {
+            collapsedFolders.insert(id)
+        }
+    }
 
     func requestSelectionChanged() async {
         guard let root = workspace?.root, let path = selectedRequest else {
@@ -346,13 +404,224 @@ final class WorkspaceStore {
         }
     }
 
+    // MARK: Logs
+
+    func loadServices() async {
+        do {
+            services = try await KestrlBridge.run { try listServices() }
+        } catch {
+            report(error)
+        }
+    }
+
+    /// Runs the stream for the selected service and its filter until the task is cancelled, which happens when the view goes away or either changes.
+    func followSelectedService() async {
+        guard let service = selectedLogService else { return }
+        let filter = logFilter
+        logLines = []
+        selectedLogSeqs = []
+        logAnchor = nil
+        logStatus = nil
+        logsFollowing = true
+
+        let inbox = LogInbox()
+        let follow = followLogs(service: service, grep: filter, sink: inbox)
+        defer { follow.cancel() }
+        while !Task.isCancelled {
+            try? await Task.sleep(for: .milliseconds(100))
+            let batch = inbox.drain()
+            appendLogLines(batch.lines)
+            if batch.ended {
+                logStatus = batch.error ?? "The service stopped."
+                return
+            }
+        }
+    }
+
+    private func appendLogLines(_ lines: [LogLine]) {
+        guard !lines.isEmpty else { return }
+        logLines.append(contentsOf: lines)
+        if logLines.count > Self.logCapacity {
+            logLines.removeFirst(logLines.count - Self.logCapacity)
+        }
+    }
+
+    /// Waits briefly after typing, then applies the filter if it is a valid pattern. An invalid one keeps the last valid filter and shows why.
+    func logFilterTextChanged() {
+        logFilterTask?.cancel()
+        logFilterTask = Task {
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled else { return }
+            applyLogFilter()
+        }
+    }
+
+    private func applyLogFilter() {
+        logFilterError = LogFilter.problem(with: logFilterText)
+        guard logFilterError == nil else { return }
+        logFilter = logFilterText.isEmpty ? nil : logFilterText
+    }
+
+    func selectLogLine(_ seq: UInt64, modifiers: NSEvent.ModifierFlags) {
+        if modifiers.contains(.command) {
+            if selectedLogSeqs.contains(seq) {
+                selectedLogSeqs.remove(seq)
+            } else {
+                selectedLogSeqs.insert(seq)
+            }
+            logAnchor = seq
+        } else if modifiers.contains(.shift), let anchor = logAnchor,
+                  let from = logLines.firstIndex(where: { $0.seq == anchor }),
+                  let to = logLines.firstIndex(where: { $0.seq == seq }) {
+            selectedLogSeqs = Set(logLines[min(from, to)...max(from, to)].map(\.seq))
+        } else {
+            selectedLogSeqs = [seq]
+            logAnchor = seq
+        }
+    }
+
+    func clearLogView() {
+        logLines = []
+        selectedLogSeqs = []
+        logAnchor = nil
+    }
+
+    func copySelectedLogLines() {
+        let text = logLines
+            .filter { selectedLogSeqs.contains($0.seq) }
+            .map { line in
+                let marker = line.stream == "stderr" ? "stderr " : ""
+                return "\(TimeFormat.clock(ms: line.tsMs)) \(marker)\(line.text)"
+            }
+            .joined(separator: "\n")
+        copyToPasteboard(text)
+    }
+
+    // MARK: Database
+
+    func loadConnections() async {
+        guard let root = workspace?.root else {
+            connections = []
+            return
+        }
+        do {
+            connections = try await KestrlBridge.run { try dbConnections(workspaceRoot: root) }
+        } catch {
+            report(error)
+        }
+    }
+
+    func setConnectionExpanded(_ name: String, expanded: Bool) {
+        if expanded {
+            expandedConnections.insert(name)
+            if tablesByConnection[name] == nil {
+                Task { await loadTables(connection: name) }
+            }
+        } else {
+            expandedConnections.remove(name)
+        }
+    }
+
+    func loadTables(connection: String) async {
+        guard let root = workspace?.root else { return }
+        let env = selectedEnvironment
+        do {
+            tablesByConnection[connection] = try await KestrlBridge.run {
+                try dbTables(workspaceRoot: root, connection: connection, env: env)
+            }
+        } catch {
+            report(error)
+        }
+    }
+
+    /// Selecting a table fills in a preview query and shows its columns.
+    func databaseSelectionChanged(from previous: DatabaseSelection?) async {
+        if previous?.connection != selectedConnection {
+            queryResult = nil
+        }
+        guard case .table(let table) = selectedDatabaseItem else {
+            tableColumns = []
+            return
+        }
+        sql = "SELECT * FROM \(table.qualifiedName) LIMIT 100"
+        await loadColumns(table)
+    }
+
+    private func loadColumns(_ table: DatabaseTable) async {
+        guard let root = workspace?.root else { return }
+        let env = selectedEnvironment
+        do {
+            let columns = try await KestrlBridge.run {
+                try dbDescribe(workspaceRoot: root, connection: table.connection, env: env, table: table.qualifiedName)
+            }
+            guard selectedDatabaseItem == .table(table) else { return }
+            tableColumns = columns
+        } catch {
+            report(error)
+        }
+    }
+
+    /// Closes the table inspector, keeping the connection selected.
+    func closeTableInspector() {
+        guard case .table(let table) = selectedDatabaseItem else { return }
+        selectedDatabaseItem = .connection(table.connection)
+    }
+
+    /// Environment changes alter what the database returns, so the table lists and result are reloaded.
+    func environmentChanged() async {
+        queryResult = nil
+        tablesByConnection = [:]
+        for name in expandedConnections {
+            await loadTables(connection: name)
+        }
+        if case .table(let table) = selectedDatabaseItem {
+            await loadColumns(table)
+        }
+    }
+
+    func runQuery() async {
+        guard let root = workspace?.root, let connection = selectedConnection, !isRunningQuery else { return }
+        let env = selectedEnvironment
+        let statement = sql
+        guard !statement.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        isRunningQuery = true
+        defer { isRunningQuery = false }
+        do {
+            let record = try await KestrlBridge.run {
+                try dbQuery(workspaceRoot: root, connection: connection, env: env, sql: statement)
+            }
+            queryResult = ShownQueryResult(record)
+        } catch {
+            report(error)
+        }
+    }
+
+    private func resetDatabase() {
+        connections = []
+        tablesByConnection = [:]
+        expandedConnections = []
+        tableColumns = []
+        queryResult = nil
+        selectedDatabaseItem = nil
+        sql = ""
+    }
+
     // MARK: Copy
+
+    func copyQueryResultJSON() {
+        guard let result = queryResult else { return }
+        copyToPasteboard(result.json())
+    }
+
+    func copyToPasteboard(_ text: String) {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(text, forType: .string)
+    }
 
     func copyShownJSON() {
         guard let json = shownExchangeJSON() else { return }
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.setString(json, forType: .string)
+        copyToPasteboard(json)
         justCopied = true
         Task {
             try? await Task.sleep(for: .seconds(1.5))
@@ -382,7 +651,7 @@ final class WorkspaceStore {
                 redacted: http.redacted,
                 error: http.error
             )
-        case .environments, .secrets:
+        case .environments, .secrets, .logs, .database:
             return nil
         }
     }
