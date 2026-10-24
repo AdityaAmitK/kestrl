@@ -9,8 +9,8 @@ CREATE TABLE sessions (
 CREATE TABLE events (
   id          TEXT PRIMARY KEY,           -- ULID (time-sortable)
   ts          INTEGER NOT NULL,           -- unix ms
-  kind        TEXT NOT NULL,              -- http | log | db
-  source      TEXT NOT NULL,              -- app | cli | simulator
+  kind        TEXT NOT NULL,              -- http | db | capture
+  source      TEXT NOT NULL,              -- app | cli | simulator | browser | port
   actor       TEXT NOT NULL,              -- me | cursor | claude-code | codex | ...
   session_id  TEXT REFERENCES sessions(id),
   workspace   TEXT,                       -- absolute path of project root
@@ -37,6 +37,15 @@ CREATE TABLE http_exchanges (
   duration_ms  INTEGER,
   error        TEXT,
   redacted     TEXT NOT NULL DEFAULT '[]' -- JSON list of secret names masked
+);
+
+CREATE TABLE db_queries (
+  event_id    TEXT PRIMARY KEY REFERENCES events(id) ON DELETE CASCADE,
+  connection  TEXT NOT NULL,
+  sql         TEXT NOT NULL,
+  rows        INTEGER,
+  duration_ms INTEGER,
+  error       TEXT
 );
 
 CREATE TABLE tags (
