@@ -59,6 +59,7 @@ final class CaptureStore {
     private static let browserKey = "kestrl.capture.browser"
 
     private var running: RunningCapture?
+    private var receiveTask: Task<Void, Never>?
     private var retainedBytes = 0
     /// Shown when the running capture ends because of a request to stop, rather than an error
     private var stopMessage = "Capture stopped."
@@ -115,14 +116,7 @@ final class CaptureStore {
         guard running == nil else { return }
         startError = nil
         let id = UUID()
-        let relay = CaptureRelay(
-            deliver: { [weak self] batch, dropped in
-                Task { @MainActor in self?.receive(batch, dropped: dropped, from: id) }
-            },
-            end: { [weak self] error in
-                Task { @MainActor in self?.finish(from: id, error: error) }
-            }
-        )
+        let relay = CaptureRelay()
         let handle: CaptureHandle
         switch mode {
         case .browser:
@@ -181,6 +175,18 @@ final class CaptureStore {
         running = RunningCapture(id: id, handle: handle, relay: relay)
         isRunning = true
         isStopping = false
+        receiveTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(150))
+                guard let self, !Task.isCancelled else { return }
+                let batch = relay.drain()
+                self.receive(batch.exchanges, dropped: batch.dropped, from: id)
+                if batch.ended {
+                    self.finish(from: id, error: batch.error)
+                    return
+                }
+            }
+        }
     }
 
     /// Ask the capture to end. It stops once cleanup finishes: the browser is closed, or the device proxy is restored.
@@ -199,10 +205,11 @@ final class CaptureStore {
 
     /// Stop on quit and wait for cleanup, so the browser is closed and any device proxy is restored before the app exits.
     /// If the wait times out, the device proxy state stays saved and is restored on the next start.
-    func stopForQuit() {
-        guard let running else { return }
+    func stopForQuit() -> Bool {
+        guard let running else { return true }
+        isStopping = true
         running.handle.stop()
-        _ = running.relay.finished.wait(timeout: .now() + 10)
+        return running.relay.finished.wait(timeout: .now() + 10) == .success
     }
 
     func copySelectedJSON() {
@@ -224,7 +231,7 @@ final class CaptureStore {
     /// Drop the oldest exchanges until the list is within both the count and byte limits.
     private func trimToLimits() {
         var removed = 0
-        while exchanges.count > 1 && (exchanges.count > Self.capacity || retainedBytes > Self.byteCapacity) {
+        while !exchanges.isEmpty && (exchanges.count > Self.capacity || retainedBytes > Self.byteCapacity) {
             retainedBytes -= exchanges.removeFirst().approximateBytes
             removed += 1
         }
@@ -234,6 +241,8 @@ final class CaptureStore {
     private func finish(from id: UUID, error: String?) {
         guard let current = running, current.id == id else { return }
         let wasStopped = isStopping
+        receiveTask?.cancel()
+        receiveTask = nil
         running = nil
         isRunning = false
         isStopping = false
@@ -241,7 +250,7 @@ final class CaptureStore {
             startError = error
             endMessage = nil
         } else {
-            endMessage = wasStopped ? stopMessage : "The browser closed, so capture stopped."
+            endMessage = wasStopped ? stopMessage : "Capture ended."
         }
         if mode == .simulator || mode == .android {
             refreshReadiness()
@@ -336,64 +345,50 @@ private struct RunningCapture {
     let relay: CaptureRelay
 }
 
-/// Receives exchanges on the capture thread and hands them over in batches. A busy source produces many exchanges a second, so the relay flushes about every 150 ms instead of once per exchange.
-/// Undelivered exchanges are bounded by bytes: when the buffer is full, the oldest are dropped and counted.
+/// A bounded inbox drained on the main actor. The final batch is consumed before the end state.
 private final class CaptureRelay: CaptureSink, @unchecked Sendable {
-    /// Text held between flushes. Bounds memory when the main actor falls behind.
-    static let pendingByteLimit = 16 * 1024 * 1024
-
-    /// Signalled when the capture thread has finished, so a quit can wait for cleanup
+    private static let pendingByteLimit = 16 * 1024 * 1024
     let finished = DispatchSemaphore(value: 0)
-
     private let lock = NSLock()
     private var pending: [CapturedExchange] = []
     private var pendingBytes = 0
     private var droppedPending = 0
-    private var flushScheduled = false
-    private let deliver: @Sendable ([CapturedExchange], Int) -> Void
-    private let end: @Sendable (String?) -> Void
+    private var ended = false
+    private var error: String?
 
-    init(
-        deliver: @escaping @Sendable ([CapturedExchange], Int) -> Void,
-        end: @escaping @Sendable (String?) -> Void
-    ) {
-        self.deliver = deliver
-        self.end = end
+    struct Batch {
+        let exchanges: [CapturedExchange]
+        let dropped: Int
+        let ended: Bool
+        let error: String?
     }
 
     func onExchange(exchange: CapturedExchange) {
         lock.lock()
+        defer { lock.unlock() }
         pending.append(exchange)
         pendingBytes += exchange.approximateBytes
-        while pendingBytes > Self.pendingByteLimit && pending.count > 1 {
+        while !pending.isEmpty && (pendingBytes > Self.pendingByteLimit || pending.count > 500) {
             pendingBytes -= pending.removeFirst().approximateBytes
             droppedPending += 1
-        }
-        let scheduleFlush = !flushScheduled
-        flushScheduled = true
-        lock.unlock()
-        if scheduleFlush {
-            DispatchQueue.global().asyncAfter(deadline: .now() + 0.15) { self.flush() }
         }
     }
 
     func onEnd(error: String?) {
-        flush()
+        lock.lock()
+        ended = true
+        self.error = error
+        lock.unlock()
         finished.signal()
-        end(error)
     }
 
-    private func flush() {
+    func drain() -> Batch {
         lock.lock()
-        let batch = pending
-        let dropped = droppedPending
+        defer { lock.unlock() }
+        let batch = Batch(exchanges: pending, dropped: droppedPending, ended: ended, error: error)
         pending = []
         pendingBytes = 0
         droppedPending = 0
-        flushScheduled = false
-        lock.unlock()
-        if !batch.isEmpty || dropped > 0 {
-            deliver(batch, dropped)
-        }
+        return batch
     }
 }

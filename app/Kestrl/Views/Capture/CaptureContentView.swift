@@ -37,7 +37,7 @@ struct CaptureContentView: View {
                 .disabled(capture.isRunning)
             }
             sourceControls
-            if capture.mode != .browser {
+            Group {
                 LabeledContent("Hosts") {
                     TextField("", text: $capture.hostFilter, prompt: Text("All hosts. Or api.example.com, *.local"))
                         .textFieldStyle(.roundedBorder)
