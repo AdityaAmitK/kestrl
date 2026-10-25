@@ -22,17 +22,40 @@
 # both would set the group on the same /dev/bpf* devices.
 
 set -eu
+PATH=/usr/bin:/bin:/usr/sbin:/sbin
+export PATH
+umask 077
 
 GROUP=kestrl_bpf
 LABEL=dev.kestrl.bpf
 HELPER_DIR="/Library/Application Support/Kestrl"
 HELPER="$HELPER_DIR/kestrl-bpf.sh"
 PLIST=/Library/LaunchDaemons/dev.kestrl.bpf.plist
+MARKER="$HELPER_DIR/installed-v1"
 CHMODBPF_PLIST=/Library/LaunchDaemons/org.wireshark.ChmodBPF.plist
 
 die() {
     printf 'kestrl-bpf: %s\n' "$*" >&2
     exit 1
+}
+
+# Refuse symlinks and writable root-run paths, including pre-existing directories.
+check_owned_path() {
+    [ ! -L "$1" ] || die "refusing symlink: $1"
+    [ -e "$1" ] || return 0
+    [ "$(stat -f %u "$1")" -eq 0 ] || die "not root-owned: $1"
+    mode=$(stat -f %Lp "$1")
+    [ "$((0$mode & 022))" -eq 0 ] || die "group/world-writable path: $1"
+}
+
+check_paths() {
+    for path in /Library "/Library/Application Support" /Library/LaunchDaemons "$HELPER_DIR" "$HELPER" "$PLIST" "$MARKER"; do
+        check_owned_path "$path"
+    done
+}
+
+is_managed() {
+    [ -f "$MARKER" ] && [ "$(cat "$MARKER")" = "Kestrl BPF setup v1" ]
 }
 
 usage() {
@@ -78,9 +101,17 @@ has_members() {
 # Assign each BPF device to kestrl_bpf with group read/write, as ChmodBPF does for access_bpf.
 apply_devices() {
     require_root
+    check_paths
+    is_managed || die "no Kestrl-managed BPF setup"
+    [ ! -e "$CHMODBPF_PLIST" ] || die "Wireshark now manages BPF; refusing to override it"
     group_exists || die "group $GROUP does not exist"
     for dev in /dev/bpf[0-9]*; do
         [ -c "$dev" ] || continue
+        current_group=$(stat -f %Sg "$dev")
+        current_mode=$(stat -f %Lp "$dev")
+        if [ "$current_group" != "$GROUP" ] && { [ "$current_group" != wheel ] || [ "$current_mode" != 600 ]; }; then
+            die "another setup owns $dev; refusing to replace its permissions"
+        fi
         chgrp "$GROUP" "$dev"
         chmod 0660 "$dev"
     done
@@ -106,11 +137,20 @@ install_access() {
         die "Wireshark ChmodBPF manages /dev/bpf* for access_bpf; Kestrl does not reassign those devices"
     fi
 
-    group_exists || dseditgroup -o create -r "Kestrl BPF access" "$GROUP"
-    dseditgroup -o edit -a "$2" -t user "$GROUP"
-
+    check_paths
+    if group_exists && ! is_managed; then
+        die "group $GROUP already exists without a Kestrl ownership marker"
+    fi
+    if { [ -e "$HELPER" ] || [ -e "$PLIST" ]; } && ! is_managed; then
+        die "Kestrl setup paths already exist without an ownership marker"
+    fi
     install -d -o root -g wheel -m 0755 "$HELPER_DIR"
     install -o root -g wheel -m 0755 "$0" "$HELPER"
+    printf '%s\n' 'Kestrl BPF setup v1' > "$MARKER"
+    chown root:wheel "$MARKER"
+    chmod 0600 "$MARKER"
+    group_exists || dseditgroup -o create -r "Kestrl BPF access" "$GROUP"
+    dseditgroup -o edit -a "$2" -t user "$GROUP"
 
     tmp=$(mktemp)
     trap 'rm -f "$tmp"' EXIT
@@ -143,6 +183,8 @@ PLIST
 
 uninstall_access() {
     require_root
+    check_paths
+    is_managed || die "no Kestrl-managed installation; refusing to remove unowned artifacts"
     name=
     if [ "$#" -eq 2 ] && [ "$1" = --user ]; then
         check_name "$2"
@@ -161,7 +203,7 @@ uninstall_access() {
 
     launchctl bootout "system/$LABEL" 2>/dev/null || true
     restore_devices
-    rm -f "$PLIST" "$HELPER"
+    rm -f "$PLIST" "$HELPER" "$MARKER"
     rmdir "$HELPER_DIR" 2>/dev/null || true
     if group_exists; then
         dseditgroup -o delete "$GROUP"
