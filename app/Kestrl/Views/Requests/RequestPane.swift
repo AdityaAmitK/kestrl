@@ -25,8 +25,11 @@ struct RequestPane: View {
             .pickerStyle(.segmented)
             .labelsHidden()
             .fixedSize()
-            .padding(.horizontal, 16)
+            .controlSize(.small)
+            .padding(.horizontal, 12)
             .padding(.vertical, 8)
+
+            Divider()
 
             switch part {
             case .params:
@@ -41,7 +44,7 @@ struct RequestPane: View {
 
     @ViewBuilder private func keyValues(_ pairs: [KeyValue], empty: String) -> some View {
         if pairs.isEmpty {
-            ContentUnavailableView("Nothing here", systemImage: "list.bullet", description: Text(empty))
+            EmptyPane("Nothing here", systemImage: "list.bullet", description: Text(empty))
         } else {
             ScrollView {
                 KeyValueGrid(title: part.rawValue, pairs: pairs)
@@ -55,7 +58,7 @@ struct RequestPane: View {
         if let body = store.requestBody {
             JSONTextView(text: body.text)
         } else {
-            ContentUnavailableView("No body", systemImage: "doc", description: Text("This request sends no body."))
+            EmptyPane("No body", systemImage: "doc", description: Text("This request sends no body."))
         }
     }
 }

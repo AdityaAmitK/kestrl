@@ -34,7 +34,7 @@ struct TableInspector: View {
                     .width(min: 64, ideal: 72)
                 }
             }
-            .inspectorColumnWidth(min: 240, ideal: 280, max: 380)
+            .inspectorColumnWidth(min: 280, ideal: 340, max: 440)
         }
     }
 }

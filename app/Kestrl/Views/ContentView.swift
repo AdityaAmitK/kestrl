@@ -38,8 +38,8 @@ struct ContentView: View {
             sectionView
         }
         .navigationSplitViewStyle(.balanced)
-        .navigationTitle(workspaceName)
-        .navigationSubtitle(store.section.title)
+        .navigationTitle(store.section.title)
+        .navigationSubtitle(workspaceName)
         .toolbar {
             toolbarItems
         }
@@ -66,7 +66,7 @@ struct ContentView: View {
         switch store.section {
         case .requests:
             // A new autosave name drops the divider people dragged out under the old widths.
-            AutosavingSplit(autosaveName: "kestrl.requests.list.v4", axis: .horizontal, firstPaneWidth: .content) {
+            AutosavingSplit(autosaveName: "kestrl.requests.list.v5", axis: .horizontal, firstPaneWidth: .content) {
                 RequestsContentView(store: store)
             } second: {
                 RequestsDetailView(store: store)
@@ -78,25 +78,25 @@ struct ContentView: View {
                 HistoryDetailView(store: store)
             }
         case .logs:
-            AutosavingSplit(autosaveName: "kestrl.logs.services.v3", axis: .horizontal, firstPaneWidth: .content) {
+            AutosavingSplit(autosaveName: "kestrl.logs.services.v4", axis: .horizontal, firstPaneWidth: .content) {
                 LogsContentView(store: store)
             } second: {
                 LogsDetailView(store: store)
             }
         case .database:
-            AutosavingSplit(autosaveName: "kestrl.database.list.v3", axis: .horizontal, firstPaneWidth: .content) {
+            AutosavingSplit(autosaveName: "kestrl.database.list.v4", axis: .horizontal, firstPaneWidth: .content) {
                 DatabaseContentView(store: store)
             } second: {
                 DatabaseDetailView(store: store)
             }
         case .environments:
-            AutosavingSplit(autosaveName: "kestrl.environments.list.v3", axis: .horizontal, firstPaneWidth: .content) {
+            AutosavingSplit(autosaveName: "kestrl.environments.list.v4", axis: .horizontal, firstPaneWidth: .content) {
                 EnvironmentsContentView(store: store)
             } second: {
                 EnvironmentDetailView(store: store)
             }
         case .secrets:
-            AutosavingSplit(autosaveName: "kestrl.secrets.list.v3", axis: .horizontal, firstPaneWidth: .content) {
+            AutosavingSplit(autosaveName: "kestrl.secrets.list.v4", axis: .horizontal, firstPaneWidth: .content) {
                 SecretsContentView(store: store)
             } second: {
                 SecretDetailView(store: store)

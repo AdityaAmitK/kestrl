@@ -7,14 +7,14 @@ struct AdHocBar: View {
     private static let methods = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 8) {
             Picker("Method", selection: $store.adHocMethod) {
                 ForEach(Self.methods, id: \.self) { method in
                     Text(method).font(.body.monospaced()).tag(method)
                 }
             }
             .labelsHidden()
-            .fixedSize()
+            .frame(width: 88)
 
             TextField("URL, such as http://localhost:4000/health", text: $store.adHocURL)
                 .textFieldStyle(.roundedBorder)

@@ -8,9 +8,9 @@ struct MethodBadge: View {
     var body: some View {
         let text = Self.textColor(for: method)
         Text(method)
-            .font(.caption.weight(.semibold).monospaced())
+            .font(.system(size: 10, weight: .semibold, design: .monospaced))
             .foregroundStyle(text)
-            .frame(minWidth: 52)
+            .frame(width: 42)
             .padding(.vertical, 2)
             .background(text.opacity(0.15), in: RoundedRectangle(cornerRadius: 4))
             .accessibilityLabel("Method \(method)")

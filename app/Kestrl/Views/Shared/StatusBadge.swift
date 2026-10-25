@@ -14,10 +14,10 @@ struct StatusBadge: View {
             Text(style.text)
                 .foregroundStyle(.primary)
         }
-        .font(.callout.weight(.semibold))
+        .font(.system(size: 11, weight: .medium))
         .padding(.horizontal, 8)
         .padding(.vertical, 3)
-        .background(style.tint.opacity(0.16), in: Capsule())
+        .background(style.tint.opacity(0.16), in: RoundedRectangle(cornerRadius: 4))
         .accessibilityElement(children: .combine)
     }
 

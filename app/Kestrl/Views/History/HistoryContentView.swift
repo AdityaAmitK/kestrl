@@ -67,7 +67,7 @@ struct HistoryContentView: View {
             }
             .overlay {
                 if store.events.isEmpty {
-                    ContentUnavailableView(
+                    EmptyPane(
                         store.historyText.isEmpty && store.historyActor == nil ? "No history yet" : "No matching events",
                         systemImage: "clock.arrow.circlepath",
                         description: Text("Requests you send appear here.")
@@ -108,8 +108,9 @@ struct HistoryContentView: View {
                 .help("Compare the two selected events")
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .controlSize(.small)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
     }
 
     private var actorMenu: some View {

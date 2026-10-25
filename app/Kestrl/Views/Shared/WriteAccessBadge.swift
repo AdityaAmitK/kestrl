@@ -8,17 +8,17 @@ struct WriteAccessBadge: View {
 
     var body: some View {
         if let isReadOnly {
-            let place = environment.map { " in \($0)" } ?? ""
             Label(
-                isReadOnly ? "Read-only\(place)" : "Writes allowed\(place)",
+                isReadOnly ? "Read-only" : "Writes allowed",
                 systemImage: isReadOnly ? "lock.fill" : "pencil"
             )
-            .font(.caption.weight(.semibold))
+            .font(.caption.weight(.medium))
+            .fixedSize()
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
-            .background(tint(isReadOnly).opacity(0.16), in: Capsule())
+            .background(tint(isReadOnly).opacity(0.16), in: RoundedRectangle(cornerRadius: 4))
         } else {
-            Label("Access shown after a query runs", systemImage: "questionmark.circle")
+            Label("Access checked on Run", systemImage: "questionmark.circle")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

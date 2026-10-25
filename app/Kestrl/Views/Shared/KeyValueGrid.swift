@@ -9,13 +9,13 @@ struct KeyValueGrid: View {
         if !pairs.isEmpty {
             VStack(alignment: .leading, spacing: 6) {
                 Text(title)
-                    .font(.headline)
-                Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 6) {
+                    .font(.caption.weight(.semibold))
+                Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 10) {
                     ForEach(pairs) { pair in
                         GridRow {
                             Text(pair.key)
                                 .foregroundStyle(.secondary)
-                                .gridColumnAlignment(.trailing)
+                                .gridColumnAlignment(.leading)
                             Text(pair.value)
                                 .font(.body.monospaced())
                                 .textSelection(.enabled)

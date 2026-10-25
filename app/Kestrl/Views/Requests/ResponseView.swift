@@ -8,7 +8,7 @@ struct ResponseView: View {
     var body: some View {
         let exchange = response.exchange
         VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 14) {
+            HStack(spacing: 10) {
                 StatusBadge(status: exchange.status, error: exchange.error)
                 Text("\(exchange.durationMs) ms")
                     .monospacedDigit()
@@ -31,8 +31,10 @@ struct ResponseView: View {
                 Spacer()
                 CopyJSONButton(store: store)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .font(.system(size: 11))
+            .controlSize(.small)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
 
             Divider()
 

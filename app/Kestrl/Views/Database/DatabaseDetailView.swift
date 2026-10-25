@@ -3,6 +3,7 @@ import SwiftUI
 /// The SQL editor above the results, for the selected connection. Selecting a table opens its columns beside the results.
 struct DatabaseDetailView: View {
     @Bindable var store: WorkspaceStore
+    @State private var isShowingColumns = false
 
     var body: some View {
         if let connection = store.selectedConnection {
@@ -15,11 +16,11 @@ struct DatabaseDetailView: View {
                     QueryResultsView(store: store)
                 }
             }
-            .inspector(isPresented: inspectorBinding) {
+            .inspector(isPresented: $isShowingColumns) {
                 TableInspector(store: store)
             }
         } else {
-            ContentUnavailableView(
+            EmptyPane(
                 "Select a connection",
                 systemImage: "cylinder.split.1x2",
                 description: Text("Pick a connection or one of its tables. Write SQL here and press ⌘↩ to run it.")
@@ -31,11 +32,16 @@ struct DatabaseDetailView: View {
         HStack(spacing: 12) {
             Label(connection, systemImage: "cylinder")
                 .font(.headline)
-            Text(store.selectedEnvironment.map { "Environment \($0)" } ?? "No environment")
-                .foregroundStyle(.secondary)
             WriteAccessBadge(isReadOnly: store.queryResult?.isReadOnly, environment: store.selectedEnvironment)
 
             Spacer()
+
+            Button { isShowingColumns.toggle() } label: {
+                Image(systemName: "sidebar.right")
+            }
+            .disabled(store.selectedTable == nil)
+            .help("Show table columns")
+            .accessibilityLabel("Show table columns")
 
             Button("Copy JSON", systemImage: "doc.on.doc") {
                 store.copyQueryResultJSON()
@@ -48,12 +54,14 @@ struct DatabaseDetailView: View {
             } label: {
                 Label("Run", systemImage: "play.fill")
             }
+            .buttonStyle(.borderedProminent)
             .keyboardShortcut(.return, modifiers: .command)
             .disabled(store.isRunningQuery || store.sql.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             .help("Run the query (⌘↩)")
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
+        .controlSize(.small)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
     }
 
     private var editor: some View {
@@ -72,12 +80,4 @@ struct DatabaseDetailView: View {
             .accessibilityLabel("SQL")
     }
 
-    private var inspectorBinding: Binding<Bool> {
-        Binding(
-            get: { store.selectedTable != nil },
-            set: { isShown in
-                if !isShown { store.closeTableInspector() }
-            }
-        )
-    }
 }

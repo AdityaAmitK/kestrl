@@ -19,9 +19,11 @@ struct EnvironmentsContentView: View {
                 .tag(name)
             }
         }
+        .listStyle(.plain)
+        .environment(\.defaultMinListRowHeight, 26)
         .overlay {
             if store.workspace?.envs.isEmpty ?? true {
-                ContentUnavailableView(
+                EmptyPane(
                     "No environments",
                     systemImage: "globe",
                     description: Text("Add a file under .kestrl/envs/ to define one.")

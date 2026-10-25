@@ -13,12 +13,14 @@ struct RequestTreeRows: View {
                     Text(node.name)
                         .lineLimit(1)
                 }
+                .listRowSeparator(.hidden)
                 .tag(request.path)
             } else {
                 DisclosureGroup(isExpanded: expansion(for: node.id)) {
                     RequestTreeRows(nodes: node.children ?? [], store: store)
                 } label: {
                     Label(node.name, systemImage: "folder")
+                        .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.secondary)
                 }
             }

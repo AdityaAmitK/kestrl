@@ -7,7 +7,7 @@ struct HistoryDetailView: View {
     var body: some View {
         switch store.selectedEventIDs.count {
         case 0:
-            ContentUnavailableView(
+            EmptyPane(
                 "No event selected",
                 systemImage: "clock.arrow.circlepath",
                 description: Text("Select an event to see its request and response.")

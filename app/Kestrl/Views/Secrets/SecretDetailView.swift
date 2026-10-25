@@ -41,7 +41,7 @@ struct SecretDetailView: View {
                 SetSecretSheet(store: store, name: secret.name)
             }
         } else {
-            ContentUnavailableView(
+            EmptyPane(
                 "Select a secret",
                 systemImage: "key",
                 description: Text("Its status and actions appear here.")

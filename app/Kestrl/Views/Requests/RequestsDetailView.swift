@@ -5,20 +5,20 @@ struct RequestsDetailView: View {
     @Bindable var store: WorkspaceStore
 
     var body: some View {
-        AutosavingSplit(autosaveName: "kestrl.requests.response", axis: .vertical, defaultFraction: 0.4) {
-            VStack(spacing: 0) {
-                RequestBar(store: store)
-                Divider()
+        VStack(spacing: 0) {
+            RequestBar(store: store)
+            Divider()
+            AutosavingSplit(autosaveName: "kestrl.requests.response.v2", axis: .vertical, defaultFraction: 0.3) {
                 requestPane
+            } second: {
+                responsePane
             }
-        } second: {
-            responsePane
         }
     }
 
     @ViewBuilder private var requestPane: some View {
         if store.selectedRequest == nil {
-            ContentUnavailableView(
+            EmptyPane(
                 "New request",
                 systemImage: "square.and.pencil",
                 description: Text("Enter a URL above and press ⌘↩ to send it. Pick a request on the left to open its file.")
@@ -37,7 +37,7 @@ struct RequestsDetailView: View {
         } else if let response = store.response {
             ResponseView(store: store, response: response)
         } else {
-            ContentUnavailableView(
+            EmptyPane(
                 "No response yet",
                 systemImage: "arrow.down.doc",
                 description: Text("Send the request to see the response. Press ⌘↩ to send.")

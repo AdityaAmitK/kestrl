@@ -13,7 +13,7 @@ struct QueryResultsView: View {
                 resultTable(result)
                 footer(result)
             } else {
-                ContentUnavailableView(
+                EmptyPane(
                     "No results yet",
                     systemImage: "tablecells",
                     description: Text("Run a query to see its rows here.")
@@ -28,11 +28,12 @@ struct QueryResultsView: View {
                 TableColumn(result.columns[index]) { row in
                     QueryCellView(store: store, cell: row.cells[index])
                 }
+                .width(min: 120, ideal: 200)
             }
         }
         .overlay {
             if result.rows.isEmpty {
-                ContentUnavailableView("No rows", systemImage: "tablecells")
+                EmptyPane("No rows", systemImage: "tablecells")
             }
         }
     }

@@ -12,7 +12,7 @@ struct SendButton: View {
                 .frame(minWidth: 64)
         }
         .buttonStyle(.borderedProminent)
-        .controlSize(.large)
+        .controlSize(.regular)
         .disabled(!store.canSendRequest)
         .help("Send the request (⌘↩)")
     }
