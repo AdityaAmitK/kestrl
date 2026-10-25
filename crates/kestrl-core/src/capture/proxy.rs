@@ -203,7 +203,7 @@ pub(crate) fn host_matches(pattern: &str, host: &str) -> bool {
     true
 }
 
-fn display_body(bytes: &[u8], encoding: Option<&str>) -> Option<String> {
+pub(crate) fn display_body(bytes: &[u8], encoding: Option<&str>) -> Option<String> {
     let decoded = match encoding.map(str::to_ascii_lowercase).as_deref() {
         Some("gzip") => read_limited(flate2::read::GzDecoder::new(bytes)),
         Some("deflate") => read_limited(flate2::read::ZlibDecoder::new(bytes)),
