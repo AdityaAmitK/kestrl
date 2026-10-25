@@ -41,16 +41,24 @@ struct JSONTextView: NSViewRepresentable {
                 let remainder = source.substring(with: NSRange(location: end, length: min(64, source.length - end))).drop(while: { $0.isWhitespace })
                 let color: NSColor
                 if token.hasPrefix("\"") {
-                    color = remainder.first == ":" ? .systemTeal : .systemGreen
+                    color = remainder.first == ":" ? Self.tokenColor(light: 0x075E6C, dark: 0x73D6E6) : Self.tokenColor(light: 0x256335, dark: 0x9DD69E)
                 } else if token == "null" {
                     color = .secondaryLabelColor
                 } else {
-                    color = .systemOrange
+                    color = Self.tokenColor(light: 0x8A4B0C, dark: 0xF2B36F)
                 }
                 styled.addAttribute(.foregroundColor, value: color, range: match.range)
             }
         }
         textView.textStorage?.setAttributedString(styled)
         textView.scrollToBeginningOfDocument(nil)
+    }
+    private static func tokenColor(light: UInt32, dark: UInt32) -> NSColor {
+        NSColor(name: nil) { appearance in
+            let hex = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? dark : light
+            return NSColor(srgbRed: CGFloat((hex >> 16) & 255) / 255,
+                           green: CGFloat((hex >> 8) & 255) / 255,
+                           blue: CGFloat(hex & 255) / 255, alpha: 1)
+        }
     }
 }
