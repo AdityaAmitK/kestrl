@@ -320,6 +320,7 @@ final class WorkspaceStore {
 
     func discardRequestDraft() async {
         errorMessage = nil
+        response = nil
         requestDrafts.removeValue(forKey: draftKey)
         if selectedRequest != nil { await requestSelectionChanged() }
     }
