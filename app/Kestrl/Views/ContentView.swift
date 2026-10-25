@@ -4,6 +4,7 @@ import SwiftUI
 /// Each section lays out its own panes, so History can give its table the full width.
 struct ContentView: View {
     @Bindable var store: WorkspaceStore
+    @Bindable var capture: CaptureStore
 
     var body: some View {
         Group {
@@ -73,6 +74,12 @@ struct ContentView: View {
                 HistoryContentView(store: store)
             } second: {
                 HistoryDetailView(store: store)
+            }
+        case .capture:
+            AutosavingSplit(autosaveName: "kestrl.capture.exchanges.v1", axis: .horizontal, firstPaneWidth: PaneWidth(minimum: 300, ideal: 340, maximum: 460)) {
+                CaptureContentView(capture: capture, workspaceRoot: store.workspace?.root)
+            } second: {
+                CaptureDetailView(capture: capture)
             }
         case .logs:
             AutosavingSplit(autosaveName: "kestrl.logs.services.v4", axis: .horizontal, firstPaneWidth: .content) {

@@ -5,7 +5,6 @@ use std::time::Duration;
 
 use serde_json::{Value, json};
 use std::net::TcpStream;
-use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tungstenite::{Message, WebSocket, stream::MaybeTlsStream};
 
@@ -14,13 +13,13 @@ use super::network::NetworkCapture;
 use crate::Result;
 
 type Socket = WebSocket<MaybeTlsStream<TcpStream>>;
-static INTERRUPTED: OnceLock<AtomicBool> = OnceLock::new();
 
 pub(super) fn capture(
     process: &mut BrowserProcess,
     hosts: &[String],
     start_url: Option<&str>,
     callback: &std::sync::Arc<dyn Fn(crate::capture::CapturedExchange) + Send + Sync>,
+    stop: &AtomicBool,
 ) -> Result<()> {
     let endpoint = format!("http://127.0.0.1:{}/json/version", process.port);
     let response: Value = reqwest::blocking::get(endpoint)?.json()?;
@@ -28,16 +27,6 @@ pub(super) fn capture(
         crate::Error::Capture("browser DevTools endpoint omitted websocket URL".to_owned())
     })?;
     let (mut socket, _) = tungstenite::connect(websocket)?;
-    let interrupted = INTERRUPTED.get_or_init(|| AtomicBool::new(false));
-    interrupted.store(false, Ordering::SeqCst);
-    ctrlc::set_handler(|| {
-        if let Some(interrupted) = INTERRUPTED.get() {
-            interrupted.store(true, Ordering::SeqCst);
-        }
-    })
-    .map_err(|error| {
-        crate::Error::Capture(format!("could not install shutdown handler: {error}"))
-    })?;
     let mut next_id = 0;
     send(
         &mut socket,
@@ -57,7 +46,7 @@ pub(super) fn capture(
     let mut network = NetworkCapture::new(hosts.to_vec());
     let mut navigated = false;
     loop {
-        if process.has_exited()? || interrupted.load(Ordering::SeqCst) {
+        if process.has_exited()? || stop.load(Ordering::Acquire) {
             break;
         }
         if let MaybeTlsStream::Plain(stream) = socket.get_mut() {
@@ -156,7 +145,7 @@ pub(super) fn capture(
                                 json!({"requestId": request_id}),
                                 session,
                             )?;
-                            let encoded = exchange_body(&mut socket, body_id)?;
+                            let encoded = exchange_body(&mut socket, body_id, stop)?;
                             if let Some(encoded) = encoded {
                                 let body = encoded["body"].as_str().unwrap_or_default();
                                 if encoded["base64Encoded"].as_bool().unwrap_or(false) {
@@ -206,8 +195,15 @@ fn send(socket: &mut Socket, id: &mut u64, method: &str, params: Value) -> Resul
     ))?;
     Ok(current)
 }
-fn exchange_body(socket: &mut Socket, expected_id: u64) -> Result<Option<Value>> {
+fn exchange_body(
+    socket: &mut Socket,
+    expected_id: u64,
+    stop: &AtomicBool,
+) -> Result<Option<Value>> {
     loop {
+        if stop.load(Ordering::Acquire) {
+            return Ok(None);
+        }
         match socket.read() {
             Ok(Message::Text(text)) => {
                 let value: Value = serde_json::from_str(&text)?;

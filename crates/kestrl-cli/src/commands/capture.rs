@@ -1,6 +1,7 @@
 //! Device capture commands.
 
 use std::io::Write;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use anyhow::Context as _;
@@ -375,6 +376,10 @@ fn run_browser(ctx: &Context, options: BrowserOptions) -> anyhow::Result<()> {
             output::print_capture_line(&exchange, offset);
         }
     });
+    let stop = Arc::new(AtomicBool::new(false));
+    let interrupt = Arc::clone(&stop);
+    ctrlc::set_handler(move || interrupt.store(true, Ordering::Release))
+        .context("install Ctrl-C handler")?;
     let browser = options.browser.as_deref().map(|name| match name {
         "chrome" => kestrl_core::capture::browser::Browser::Chrome,
         "arc" => kestrl_core::capture::browser::Browser::Arc,
@@ -393,6 +398,7 @@ fn run_browser(ctx: &Context, options: BrowserOptions) -> anyhow::Result<()> {
             profile_callback: Arc::new(|profile| {
                 eprintln!("Browser capture isolated profile: {}", profile.display());
             }),
+            stop,
         })?;
     eprintln!(
         "Browser capture used isolated profile: {}",

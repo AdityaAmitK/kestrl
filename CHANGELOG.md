@@ -5,6 +5,7 @@ All notable changes are documented here. The format follows [Keep a Changelog](h
 ## [Unreleased]
 
 ### Fixed
+- `kestrl capture browser` stops on Ctrl-C through a per-capture stop flag instead of a process-wide interrupt, so the app can start and stop captures repeatedly. A stop also ends the wait for a response body that the browser never sends.
 - macOS app: the list column of each section starts at 280 pt (220–420 pt) instead of about 45% of the window; the sidebar is 180–240 pt. Log lines stay on one row, with horizontal scrolling, unless View ▸ Wrap log lines (⌥⌘W) is on.
 - macOS app: auto-follow keeps log timestamps visible and only pauses on user scrolling; Clear resumes following new output.
 - Browser capture removes abandoned `kestrl-browser-*` temporary profiles when no browser process is using them; device and browser capture lines display full URLs without default HTTP(S) ports.
@@ -13,6 +14,7 @@ All notable changes are documented here. The format follows [Keep a Changelog](h
 - macOS request editor: editable method, URL, headers, query params, JSON/text/form bodies and profiles; send without saving, explicit Save/Save As, in-memory drafts, external-edit protection and confirmation before quitting with unsaved edits.
 - macOS workbench: compact pane headers and empty states, searchable request collection, persistent top request bar, syntax-colored response bodies, and on-demand table columns.
 - `kestrl capture port <port>` plain-HTTP loopback packet capture with bounded TCP reassembly, HTTP/1 framing, host filtering, shared secret redaction and optional history recording. macOS BPF access uses a one-time administrator setup, `sudo sh scripts/kestrl-bpf.sh install --user <name>`, which creates a dedicated `kestrl_bpf` group and a root-owned boot-time LaunchDaemon. Membership lets that user read all interfaces through BPF, not only loopback. `kestrl capture port setup|status|uninstall` report the plan, the current access, and the removal command without changing system state.
+- macOS app: Capture section runs browser capture: pick a browser, a start URL and host filters, then Start and Stop. Exchanges appear live (newest first, up to 500), with status, timing, headers, body, Copy JSON, and an opt-in Save to history. Quitting the app closes the capture browser first.
 - macOS app: Logs section streams a running service's log with a local-time gutter, stderr marking, pause-on-scroll, regex filter, and Copy and Clear.
 - macOS app: a JSON log line with `level` and `message` shows a level chip, the message, then its other keys as `key=value`. The raw line shows on hover and is what Copy copies.
 - macOS app: Database section lists connections and their tables, runs SQL with ⌘↩, shows results as a table with Copy JSON, and previews a table's columns.

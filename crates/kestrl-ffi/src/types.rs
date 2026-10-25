@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 
 /// One header, query value, environment variable or `--var` override.
-#[derive(Debug, uniffi::Record)]
+#[derive(Debug, Clone, uniffi::Record)]
 pub struct KeyValue {
     pub key: String,
     pub value: String,
