@@ -3,11 +3,11 @@ class Kestrl < Formula
   homepage "https://kestrl.adityakinjawadekar.com"
   url "https://github.com/AdityaAmitK/kestrl/releases/download/vVERSION/kestrl-VERSION-macos-universal.tar.gz"
   sha256 "SHA256"
-  license any_of: ["MIT", "Apache-2.0"]
+  license "MIT"
 
   def install
     bin.install "kestrl"
-    doc.install "README.md", "LICENSE-MIT", "LICENSE-APACHE"
+    doc.install "README.md", "LICENSE"
     pkgshare.install "kestrl-bpf.sh"
   end
 

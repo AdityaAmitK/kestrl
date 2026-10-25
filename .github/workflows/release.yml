@@ -58,8 +58,8 @@ jobs:
           mkdir -p dist/cli
           lipo -create "target/${targets[0]}/release/kestrl" "target/${targets[1]}/release/kestrl" -output dist/cli/kestrl
           codesign --force --sign - dist/cli/kestrl
-          cp LICENSE-MIT LICENSE-APACHE README.md scripts/kestrl-bpf.sh dist/cli/
-          tar -C dist/cli -czf "dist/kestrl-$VERSION-macos-universal.tar.gz" kestrl LICENSE-MIT LICENSE-APACHE README.md kestrl-bpf.sh
+          cp LICENSE README.md scripts/kestrl-bpf.sh dist/cli/
+          tar -C dist/cli -czf "dist/kestrl-$VERSION-macos-universal.tar.gz" kestrl LICENSE README.md kestrl-bpf.sh
           cd dist
           shasum -a 256 "kestrl-$VERSION-macos-universal.tar.gz" > "kestrl-$VERSION-macos-universal.tar.gz.sha256"
       - name: Install XcodeGen
