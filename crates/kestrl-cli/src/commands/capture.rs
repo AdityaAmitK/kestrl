@@ -189,11 +189,20 @@ pub fn run(ctx: &Context, args: CaptureArgs) -> anyhow::Result<()> {
             output::print_capture_line(&exchange, offset);
         }
     });
+    let stop = Arc::new(AtomicBool::new(false));
+    let interrupt = Arc::clone(&stop);
+    ctrlc::set_handler(move || interrupt.store(true, Ordering::Release))
+        .context("install Ctrl-C handler")?;
+    eprintln!(
+        "Capturing on 127.0.0.1:{}. Ctrl-C stops capture and restores the device proxy.",
+        options.port
+    );
     capture::session::run(capture::session::SessionOptions {
         port: options.port,
         hosts: options.host,
         callback,
         simulator,
+        stop,
     })?;
     Ok(())
 }
@@ -298,8 +307,12 @@ fn run_port(ctx: &Context, options: PortOptions) -> anyhow::Result<()> {
                     output::print_capture_line(&exchange, offset);
                 }
             });
+            let stop = Arc::new(AtomicBool::new(false));
+            let interrupt = Arc::clone(&stop);
+            ctrlc::set_handler(move || interrupt.store(true, Ordering::Release))
+                .context("install Ctrl-C handler")?;
             eprintln!("Capturing plain HTTP on loopback port {port}; press Ctrl-C to stop.");
-            capture::port::run(port, options.host, callback)?;
+            capture::port::run_cancellable(port, options.host, callback, stop)?;
             Ok(())
         }
     }

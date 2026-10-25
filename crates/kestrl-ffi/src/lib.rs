@@ -15,8 +15,10 @@ mod workspace;
 uniffi::setup_scaffolding!();
 
 pub use capture::{
-    BrowserCapture, BrowserCaptureOptions, CaptureBrowser, CaptureSink, CapturedExchange,
-    start_browser_capture,
+    BrowserCaptureOptions, CaptureBrowser, CaptureHandle, CaptureSink, CapturedExchange,
+    DeviceCaptureOptions, DeviceTarget, PortCaptureOptions, PortCaptureSetup,
+    android_capture_problem, port_capture_setup, simulator_capture_problem, start_browser_capture,
+    start_device_capture, start_port_capture,
 };
 pub use db::{
     ColumnInfo, QueryResultRecord, TableInfo, db_connections, db_describe, db_query, db_tables,

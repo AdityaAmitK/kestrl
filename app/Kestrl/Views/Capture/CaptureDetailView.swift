@@ -57,7 +57,7 @@ struct CaptureDetailView: View {
                 }
             }
         } else {
-            ContentUnavailableView(
+            EmptyPane(
                 "Select an exchange",
                 systemImage: "dot.radiowaves.left.and.right",
                 description: Text("Its headers, body and status appear here.")
@@ -109,12 +109,12 @@ struct CaptureDetailView: View {
             if let preparedBody, !preparedBody.text.isEmpty {
                 JSONTextView(text: preparedBody.text)
             } else {
-                ContentUnavailableView("No body", systemImage: "doc.plaintext")
+                EmptyPane("No body", systemImage: "doc.plaintext")
             }
         case .headers:
             let headers = side == .request ? exchange.requestHeaders : exchange.responseHeaders
             if headers.isEmpty {
-                ContentUnavailableView("No headers", systemImage: "list.bullet.rectangle")
+                EmptyPane("No headers", systemImage: "list.bullet.rectangle")
             } else {
                 ScrollView {
                     KeyValueGrid(title: side.rawValue, pairs: headers)

@@ -16,6 +16,9 @@ struct ContentView: View {
         }
         .frame(minWidth: 960, minHeight: 600)
         .preferredColorScheme(store.appearance.colorScheme)
+        .onChange(of: store.workspace?.root) { _, _ in
+            capture.stopForWorkspaceChange()
+        }
         .onChange(of: store.isShowingOpenPanel) { _, isShowing in
             guard isShowing else { return }
             store.isShowingOpenPanel = false

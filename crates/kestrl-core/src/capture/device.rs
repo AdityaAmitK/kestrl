@@ -18,6 +18,34 @@ fn run(program: &str, args: &[&str]) -> Result<String> {
     Ok(String::from_utf8_lossy(&output.stdout).trim().to_owned())
 }
 
+/// Check, without changing anything, that an iOS Simulator is booted for capture.
+pub fn check_simulator() -> Result<()> {
+    let text = run("xcrun", &["simctl", "list", "devices", "booted"])?;
+    if text.contains("(Booted)") {
+        return Ok(());
+    }
+    Err(Error::Capture(
+        "No booted iOS Simulator. Boot one in Xcode or with `xcrun simctl boot <device>`."
+            .to_owned(),
+    ))
+}
+
+/// Check, without changing anything, that an Android device or emulator is online for capture.
+pub fn check_android() -> Result<()> {
+    let text = run("adb", &["devices"])?;
+    let online = text.lines().skip(1).any(|line| {
+        line.split_once('\t')
+            .is_some_and(|(serial, state)| !serial.is_empty() && state.trim() == "device")
+    });
+    if online {
+        return Ok(());
+    }
+    Err(Error::Capture(
+        "No running Android emulator. Start one in Android Studio or with `emulator -avd <name>`."
+            .to_owned(),
+    ))
+}
+
 /// Add the Kestrl root certificate to the booted iOS Simulator.
 pub fn trust_simulator(certificate: &str) -> Result<()> {
     run(

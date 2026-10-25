@@ -137,7 +137,8 @@ pub fn run_cancellable(
 const HELPER_PATH: &str = "/Library/Application Support/Kestrl/kestrl-bpf.sh";
 /// LaunchDaemon that re-applies `kestrl_bpf` access to BPF devices at boot.
 const LAUNCH_DAEMON_PATH: &str = "/Library/LaunchDaemons/dev.kestrl.bpf.plist";
-const SETUP_COMMAND: &str = "sudo sh scripts/kestrl-bpf.sh install --user <your-username>";
+/// The command the user runs from a Kestrl checkout. Kestrl never runs it.
+pub const SETUP_COMMAND: &str = "sudo sh scripts/kestrl-bpf.sh install --user <your-username>";
 const UNINSTALL_COMMAND: &str = "sudo sh scripts/kestrl-bpf.sh uninstall --user <your-username>";
 
 /// Describe the one-time BPF setup without changing system state.
@@ -154,17 +155,7 @@ Log out and back in after setup. This command does not change system state."
 
 /// Report whether BPF access is available and whether the Kestrl setup is installed.
 pub fn status() -> String {
-    let accessible = std::fs::read_dir("/dev").ok().is_some_and(|entries| {
-        entries.flatten().any(|entry| {
-            entry.file_name().to_string_lossy().starts_with("bpf")
-                && std::fs::OpenOptions::new()
-                    .read(true)
-                    .write(true)
-                    .open(entry.path())
-                    .is_ok()
-        })
-    });
-    if accessible {
+    if bpf_accessible() {
         "Port capture status: BPF device access is available to this process.".to_owned()
     } else if setup_installed() {
         "Port capture status: unavailable to this process. The Kestrl BPF setup is installed; if you were just added to `kestrl_bpf`, log out and back in. Run `kestrl capture port setup` to review the setup.".to_owned()
@@ -187,7 +178,22 @@ This removes your membership. When no members of `kestrl_bpf` remain, it also un
     ))
 }
 
-fn setup_installed() -> bool {
+/// Whether this process can open a BPF device. Opening a device changes no system state.
+pub fn bpf_accessible() -> bool {
+    std::fs::read_dir("/dev").ok().is_some_and(|entries| {
+        entries.flatten().any(|entry| {
+            entry.file_name().to_string_lossy().starts_with("bpf")
+                && std::fs::OpenOptions::new()
+                    .read(true)
+                    .write(true)
+                    .open(entry.path())
+                    .is_ok()
+        })
+    })
+}
+
+/// Whether the Kestrl BPF helper or LaunchDaemon is installed.
+pub fn setup_installed() -> bool {
     Path::new(HELPER_PATH).exists() || Path::new(LAUNCH_DAEMON_PATH).exists()
 }
 
