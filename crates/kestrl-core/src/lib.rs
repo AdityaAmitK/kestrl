@@ -3,6 +3,7 @@
 
 pub mod actor;
 pub mod capture;
+pub mod collections;
 pub mod connection_files;
 pub mod db;
 pub mod duration;

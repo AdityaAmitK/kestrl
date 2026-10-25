@@ -2,6 +2,7 @@
 //! thin wrapper: it converts types and calls `kestrl-core`.
 
 mod capture;
+mod collections;
 mod db;
 mod envs;
 mod error;
@@ -20,6 +21,10 @@ pub use capture::{
     DeviceCaptureOptions, DeviceTarget, PortCaptureOptions, PortCaptureSetup,
     android_capture_problem, port_capture_setup, simulator_capture_problem, start_browser_capture,
     start_device_capture, start_port_capture,
+};
+pub use collections::{
+    FolderEnvironmentVariables, FolderSettingsRecord, create_folder, create_request,
+    duplicate_request, move_item, read_folder_settings, save_folder_settings,
 };
 pub use db::{
     ColumnInfo, ConnectionRecord, QueryResultRecord, TableInfo, connection_kinds, db_connections,

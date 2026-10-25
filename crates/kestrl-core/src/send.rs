@@ -3,6 +3,7 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
+use crate::collections;
 use crate::env::Environment;
 use crate::history::{EventMeta, History, NewHttpEvent, RetentionOptions};
 use crate::http::{self, Client, Exchange};
@@ -52,18 +53,6 @@ pub struct Sent {
 /// Resolve, send and record one request in the workspace at `root`.
 pub fn send(root: &Path, target: Target, options: &SendOptions, client: &Client) -> Result<Sent> {
     let config = WorkspaceConfig::load(root)?;
-    let env_name = options
-        .env
-        .as_deref()
-        .or(config.default_env.as_deref())
-        .unwrap_or("local");
-    let implicit_env = options.env.is_none() && config.default_env.is_none();
-    let vars = Variables {
-        overrides: options.vars.clone(),
-        environment: load_environment(root, env_name, implicit_env)?,
-        workspace: config.vars.clone(),
-        redactor: Redactor::default(),
-    };
     let (request_ref, request_file) = match target {
         Target::Draft {
             request,
@@ -78,11 +67,36 @@ pub fn send(root: &Path, target: Target, options: &SendOptions, client: &Client)
         Target::File(path) => (Some(request_ref(root, &path)?), request::load(&path)?),
         Target::AdHoc { method, url } => (None, request::ad_hoc(&method, &url)),
     };
+    // A request inside the workspace picks up its collection folders' settings.
+    let collection_request = request_ref
+        .as_deref()
+        .filter(|path| !Path::new(path).is_absolute());
+    let folder_env = match collection_request {
+        Some(path) => collections::default_env_for(root, path)?,
+        None => None,
+    };
+    let env_name = options
+        .env
+        .clone()
+        .or(folder_env)
+        .or(config.default_env.clone())
+        .unwrap_or_else(|| "local".to_owned());
+    let implicit_env = options.env.is_none() && config.default_env.is_none();
+    let vars = Variables {
+        overrides: options.vars.clone(),
+        collection: match collection_request {
+            Some(path) => collections::variables_for(root, path, &env_name)?,
+            None => BTreeMap::new(),
+        },
+        environment: load_environment(root, &env_name, implicit_env)?,
+        workspace: config.vars.clone(),
+        redactor: Redactor::default(),
+    };
     let resolved = request::resolve(
         request_file,
         root,
         &config,
-        env_name,
+        &env_name,
         &options.profiles,
         vars,
     )?;
@@ -92,7 +106,7 @@ pub fn send(root: &Path, target: Target, options: &SendOptions, client: &Client)
         actor: options.actor.clone(),
         session_id: None,
         workspace: Some(root.display().to_string()),
-        env: options.env.clone().or(config.default_env),
+        env: Some(env_name.clone()),
         request_ref,
     };
     let event = record(

@@ -7,7 +7,10 @@ use crate::{Error, Result};
 
 #[derive(Default)]
 pub struct Variables {
+    /// `--var` values; highest precedence
     pub overrides: BTreeMap<String, String>,
+    /// Variables from the request's collection folders (`folder.toml`), nearest folder winning
+    pub collection: BTreeMap<String, String>,
     pub environment: BTreeMap<String, String>,
     pub workspace: BTreeMap<String, String>,
     pub redactor: Redactor,
@@ -58,6 +61,7 @@ impl Variables {
                 let value = self
                     .overrides
                     .get(name)
+                    .or_else(|| self.collection.get(name))
                     .or_else(|| self.environment.get(name))
                     .or_else(|| self.workspace.get(name))
                     .ok_or_else(|| Error::UnknownVariable(name.to_owned()))?

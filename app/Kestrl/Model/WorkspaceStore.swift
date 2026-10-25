@@ -304,6 +304,8 @@ final class WorkspaceStore {
             let detail = try await KestrlBridge.run { try readRequestFile(workspaceRoot: root, path: path) }
             guard selectedRequest == path else { return }
             requestDetail = detail
+            await applyFolderDefaultEnvironment(for: path)
+            await loadEditorVariables()
             let loaded = RequestEditorDraft(detail)
             if requestDrafts[draftKey] == nil { requestDraft = loaded }
             originalDrafts[draftKey] = loaded
@@ -360,6 +362,25 @@ final class WorkspaceStore {
     }
 
     /// Returns to the unsaved draft. Existing edits are preserved when navigating away.
+    /// A request inside a folder whose `folder.toml` sets `default_env` switches the toolbar to it,
+    /// so the app sends with the same environment the CLI would.
+    private func applyFolderDefaultEnvironment(for path: String) async {
+        guard let root = workspace?.root else { return }
+        // "a/b/c.req.toml" → folders "a" then "a/b"; the nearest one setting a default wins.
+        let parts = path.split(separator: "/").map(String.init)
+        var folderDefault: String?
+        for count in 1..<max(parts.count, 1) {
+            let folder = parts[..<count].joined(separator: "/")
+            if let settings = try? await KestrlBridge.run({ try readFolderSettings(workspaceRoot: root, folder: folder) }),
+               let env = settings.defaultEnv {
+                folderDefault = env
+            }
+        }
+        if let folderDefault, workspace?.envs.contains(folderDefault) == true, selectedEnvironment != folderDefault {
+            selectedEnvironment = folderDefault
+        }
+    }
+
     func newRequest() {
         section = .requests
         selectedRequest = nil
@@ -539,9 +560,11 @@ final class WorkspaceStore {
         editorVariables = []
         guard let root = workspace?.root else { return }
         let env = selectedEnvironment
+        // Folder variables depend on which request is open.
+        let request = selectedRequest
         do {
-            let found = try await KestrlBridge.run { try variableCatalog(workspaceRoot: root, env: env) }
-            guard workspace?.root == root, selectedEnvironment == env else { return }
+            let found = try await KestrlBridge.run { try variableCatalog(workspaceRoot: root, env: env, requestPath: request) }
+            guard workspace?.root == root, selectedEnvironment == env, selectedRequest == request else { return }
             editorVariables = found
         } catch { report(error) }
     }

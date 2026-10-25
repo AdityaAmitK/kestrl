@@ -18,6 +18,8 @@ pub struct WorkspaceInfo {
     pub envs: Vec<String>,
     pub profiles: Vec<String>,
     pub requests: Vec<RequestEntry>,
+    /// Collection folders, workspace-relative, including empty ones under `requests/`
+    pub folders: Vec<String>,
     pub settings: WorkspaceSettings,
 }
 
@@ -45,7 +47,9 @@ pub fn open_workspace(path: String) -> Result<WorkspaceInfo, KestrlError> {
     let root = workspace::find_root(Path::new(&path))?;
     let config = WorkspaceConfig::load(&root)?;
     let retention = config.retention;
-    let requests = workspace::request_files(&root)?
+    let request_paths = workspace::request_files(&root)?;
+    let folders = kestrl_core::collections::folders(&root, &request_paths)?;
+    let requests = request_paths
         .into_iter()
         .map(|path| {
             let loaded = request::load(&root.join(&path)).ok();
@@ -62,6 +66,7 @@ pub fn open_workspace(path: String) -> Result<WorkspaceInfo, KestrlError> {
         envs: Environment::names(&root)?,
         profiles: profile::names(&root)?,
         requests,
+        folders,
         settings: WorkspaceSettings {
             history_db: history::default_path()?.display().to_string(),
             max_age_days: retention.max_age_days,

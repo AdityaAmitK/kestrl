@@ -60,10 +60,19 @@ pub struct VariableInfo {
 
 /// Effective environment/workspace variables and referenced Keychain names.
 /// Preview expansion masks secrets before reading them; unresolved values remain templates.
-pub fn variable_catalog(root: &Path, env: Option<&str>) -> Result<Vec<VariableInfo>> {
-    let (_, mut vars) = workspace::load_variables(root, env)?;
+/// With `request`, variables from that request's collection folders are included and win.
+pub fn variable_catalog(
+    root: &Path,
+    env: Option<&str>,
+    request: Option<&str>,
+) -> Result<Vec<VariableInfo>> {
+    let (env_name, mut vars) = workspace::load_variables(root, env)?;
+    if let Some(request) = request {
+        vars.collection = crate::collections::variables_for(root, request, &env_name)?;
+    }
     let mut effective = vars.workspace.clone();
     effective.extend(vars.environment.clone());
+    effective.extend(vars.collection.clone());
     let stored = crate::secrets::stored_names()?;
     let statuses: BTreeMap<String, bool> = crate::secrets::referenced_in_workspace(root)?
         .into_iter()
@@ -82,7 +91,9 @@ pub fn variable_catalog(root: &Path, env: Option<&str>) -> Result<Vec<VariableIn
         }
         let value = redactor.redact(&template);
         catalog.push(VariableInfo {
-            source: if vars.environment.contains_key(&name) {
+            source: if vars.collection.contains_key(&name) {
+                "folder"
+            } else if vars.environment.contains_key(&name) {
                 "environment"
             } else {
                 "workspace"

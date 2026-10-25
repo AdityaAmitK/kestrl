@@ -36,7 +36,7 @@ kestrl run requests/users -e local            # every request in a folder, in or
 
 `send` JSON: `{ id, status, ms, headers, body, redacted, error }`. `id` is the history event id.
 
-Request files are plain TOML (`*.req.toml`): `method`, `url`, optional `profiles`, `[headers]`, `[query]`, `[body] type = "json"|"text"|"form"`. Environments are `.kestrl/envs/<env>.toml` with `[vars]`. Profiles (`.kestrl/profiles/<name>.toml`) add headers or query params, explicitly with `-p` or automatically via a `[when]` block. Precedence: `--var` > environment > workspace; profiles override the request file's own headers and query.
+Request files are plain TOML (`*.req.toml`): `method`, `url`, optional `profiles`, `[headers]`, `[query]`, `[body] type = "json"|"text"|"form"`. Environments are `.kestrl/envs/<env>.toml` with `[vars]`. Profiles (`.kestrl/profiles/<name>.toml`) add headers or query params, explicitly with `-p` or automatically via a `[when]` block. Precedence: `--var` > collection folder (`folder.toml` next to the request, nearest first) > environment > workspace; profiles override the request file's own headers and query. A folder's `default_env` is used when you don't pass `-e`.
 
 ## History
 

@@ -75,7 +75,7 @@ final class EnvironmentEditor {
         }
         do {
             let pairs = try await KestrlBridge.run { try environmentVariables(workspaceRoot: root, env: environment) }
-            let found = try await KestrlBridge.run { try variableCatalog(workspaceRoot: root, env: environment) }
+            let found = try await KestrlBridge.run { try variableCatalog(workspaceRoot: root, env: environment, requestPath: nil) }
             let loaded = pairs.map { EnvironmentRow(name: $0.key, value: $0.value) }
             catalog = found
             rows = loaded
@@ -102,7 +102,7 @@ final class EnvironmentEditor {
             }
             rows = trimmed
             savedRows = trimmed
-            catalog = (try? await KestrlBridge.run { try variableCatalog(workspaceRoot: root, env: environment) }) ?? catalog
+            catalog = (try? await KestrlBridge.run { try variableCatalog(workspaceRoot: root, env: environment, requestPath: nil) }) ?? catalog
             await store.environmentFilesChanged()
             return true
         } catch {
