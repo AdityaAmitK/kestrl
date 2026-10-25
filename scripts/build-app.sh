@@ -31,8 +31,13 @@ xcodegen generate --spec "$ROOT/app/project.yml"
 
 DERIVED="$ROOT/target/app"
 step "Building Kestrl ($CONFIGURATION)"
+# Release builds are universal (Apple Silicon and Intel), like the CLI.
+ARCH_SETTINGS=()
+if [[ "$CONFIGURATION" == "Release" ]]; then
+    ARCH_SETTINGS=(ARCHS="arm64 x86_64" ONLY_ACTIVE_ARCH=NO)
+fi
 xcodebuild -project "$ROOT/app/Kestrl.xcodeproj" -scheme Kestrl -configuration "$CONFIGURATION" \
-    -derivedDataPath "$DERIVED" -quiet build
+    -derivedDataPath "$DERIVED" -quiet ${ARCH_SETTINGS[@]+"${ARCH_SETTINGS[@]}"} build
 
 APP="$DERIVED/Build/Products/$CONFIGURATION/Kestrl.app"
 step "Built"
