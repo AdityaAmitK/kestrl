@@ -220,6 +220,7 @@ fn run_port(ctx: &Context, options: PortOptions) -> anyhow::Result<()> {
             let port = options
                 .port
                 .ok_or_else(|| anyhow::anyhow!("provide a port: `kestrl capture port <port>`"))?;
+            kestrl_core::capture::port::validate_port(port)?;
             let cwd = std::env::current_dir()?;
             let root = workspace::find_root(&cwd).ok();
             let config = root

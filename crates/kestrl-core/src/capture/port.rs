@@ -2,7 +2,10 @@
 
 use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::net::{Ipv4Addr, Ipv6Addr};
-use std::sync::Arc;
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use crate::{Error, Result};
@@ -13,14 +16,36 @@ const MAX_FLOWS: usize = 16;
 const MAX_STREAM_BYTES: usize = 1024 * 1024 + 64 * 1024;
 const MAX_HEADER_BYTES: usize = 64 * 1024;
 const MAX_BODY_BYTES: usize = 1024 * 1024;
+const MAX_CAPTURE_BYTES: usize = 8 * 1024 * 1024;
 
 type Callback = Arc<dyn Fn(CapturedExchange) + Send + Sync>;
 
 /// Start loopback-only plain-HTTP capture on macOS `lo0`.
 pub fn run(port: u16, hosts: Vec<String>, callback: Callback) -> Result<()> {
+    run_cancellable(port, hosts, callback, Arc::new(AtomicBool::new(false)))
+}
+
+/// Validate a port number before the CLI announces capture startup.
+pub fn validate_port(port: u16) -> Result<()> {
     if port == 0 {
         return Err(Error::Capture(
             "port must be between 1 and 65535".to_owned(),
+        ));
+    }
+    Ok(())
+}
+
+/// Start capture that can be stopped by a session owner.
+pub fn run_cancellable(
+    port: u16,
+    hosts: Vec<String>,
+    callback: Callback,
+    cancelled: Arc<AtomicBool>,
+) -> Result<()> {
+    validate_port(port)?;
+    if !cfg!(target_os = "macos") {
+        return Err(Error::Capture(
+            "port capture is supported only on macOS lo0".to_owned(),
         ));
     }
     let device = pcap::Capture::from_device("lo0")
@@ -39,6 +64,9 @@ pub fn run(port: u16, hosts: Vec<String>, callback: Callback) -> Result<()> {
         .map_err(capture_error)?;
     let mut flows = HashMap::<FlowKey, Flow>::new();
     loop {
+        if cancelled.load(Ordering::Relaxed) {
+            return Ok(());
+        }
         match device.next_packet() {
             Ok(packet) => {
                 if let Some(segment) = decode_loopback(packet.data) {
@@ -51,21 +79,32 @@ pub fn run(port: u16, hosts: Vec<String>, callback: Callback) -> Result<()> {
                         segment.destination.clone(),
                         segment.destination_port,
                     );
-                    if !flows.contains_key(&key)
-                        && flows.len() >= MAX_FLOWS
-                        && let Some(oldest) = flows
-                            .iter()
-                            .min_by_key(|(_, flow)| flow.last_seen)
-                            .map(|(key, _)| key.clone())
-                    {
-                        flows.remove(&oldest);
+                    if !flows.contains_key(&key) && flows.len() >= MAX_FLOWS {
+                        continue;
                     }
                     let flow = flows.entry(key.clone()).or_insert_with(|| Flow::new(&key));
                     flow.last_seen = Instant::now();
-                    if let Some(exchange) = flow.accept(segment, &hosts, port) {
+                    let exchanges = flow.accept(segment, port);
+                    let flow_closed = flow.closed;
+                    for exchange in exchanges.into_iter().filter(|exchange| {
+                        hosts.is_empty()
+                            || hosts.iter().any(|pattern| {
+                                host_matches(
+                                    pattern,
+                                    host_name(
+                                        exchange
+                                            .url
+                                            .split_once("://")
+                                            .map_or(exchange.url.as_str(), |(_, rest)| {
+                                                rest.split('/').next().unwrap_or(rest)
+                                            }),
+                                    ),
+                                )
+                            })
+                    }) {
                         callback(exchange);
                     }
-                    if flow.closed {
+                    if flow_closed {
                         flows.remove(&key);
                     }
                 }
@@ -85,17 +124,34 @@ pub fn run(port: u16, hosts: Vec<String>, callback: Callback) -> Result<()> {
 
 /// Report the current BPF access constraint without changing system state.
 pub fn setup_status() -> String {
-    "Port capture needs permission to open macOS /dev/bpf devices. No setup command can safely grant that permission under the current constraints: changing BPF device permissions, adding users to groups, installing privileged helpers, and creating launch daemons are prohibited. A separately approved, signed macOS privileged helper would need to open only loopback BPF, pass the capture handle to unprivileged Kestrl, and exit; its administrator-run install and uninstall commands must be reviewed before they can be supplied. No command here changes system state.".to_owned()
+    "Port capture uses macOS BPF and requires membership in the `access_bpf` group. Setup requires an administrator to install the system ChmodBPF package or an equivalent reviewed configuration. This command does not change system state.".to_owned()
 }
 
 /// Report whether a privileged port-capture helper is installed.
 pub fn status() -> String {
-    format!("Port capture status: unavailable. {}", setup_status())
+    let accessible = std::fs::read_dir("/dev").ok().is_some_and(|entries| {
+        entries.flatten().any(|entry| {
+            entry.file_name().to_string_lossy().starts_with("bpf")
+                && std::fs::OpenOptions::new()
+                    .read(true)
+                    .write(true)
+                    .open(entry.path())
+                    .is_ok()
+        })
+    });
+    if accessible {
+        "Port capture status: BPF device access is available to this process.".to_owned()
+    } else {
+        format!(
+            "Port capture status: unavailable to this process. {}",
+            setup_status()
+        )
+    }
 }
 
 /// Remove a port-capture helper if one exists.
 pub fn uninstall() -> Result<String> {
-    Ok("No Kestrl port-capture privileged component is installed, so there is nothing to uninstall.".to_owned())
+    Ok("No Kestrl-owned privileged component is installed; the system ChmodBPF setup is not managed by Kestrl.".to_owned())
 }
 
 fn capture_error(error: pcap::Error) -> Error {
@@ -148,6 +204,7 @@ struct Segment {
     payload: Vec<u8>,
     fin: bool,
     syn: bool,
+    rst: bool,
 }
 
 fn decode_loopback(packet: &[u8]) -> Option<Segment> {
@@ -155,7 +212,7 @@ fn decode_loopback(packet: &[u8]) -> Option<Segment> {
         return None;
     }
     let family = u32::from_ne_bytes(packet.get(..4)?.try_into().ok()?);
-    let (mut offset, protocol, source, destination) = match family {
+    let (mut offset, protocol, source, destination, ip_end) = match family {
         2 => {
             let ip = packet.get(4..)?;
             if ip.len() < 20 || ip[0] >> 4 != 4 {
@@ -176,6 +233,7 @@ fn decode_loopback(packet: &[u8]) -> Option<Segment> {
                 ip[9],
                 source.to_string(),
                 destination.to_string(),
+                4 + usize::from(u16::from_be_bytes([ip[2], ip[3]])),
             )
         }
         30 => {
@@ -213,6 +271,7 @@ fn decode_loopback(packet: &[u8]) -> Option<Segment> {
                 next_header,
                 source.to_string(),
                 destination.to_string(),
+                4 + 40 + usize::from(u16::from_be_bytes([ip[4], ip[5]])),
             )
         }
         _ => return None,
@@ -220,7 +279,7 @@ fn decode_loopback(packet: &[u8]) -> Option<Segment> {
     if protocol != 6 {
         return None;
     }
-    if offset + 20 > packet.len() {
+    if ip_end > packet.len() || offset + 20 > ip_end {
         return None;
     }
     let tcp = &packet[offset..];
@@ -228,7 +287,7 @@ fn decode_loopback(packet: &[u8]) -> Option<Segment> {
     let destination_port = u16::from_be_bytes([tcp[2], tcp[3]]);
     let sequence = u32::from_be_bytes(tcp[4..8].try_into().ok()?);
     let header = usize::from(tcp[12] >> 4) * 4;
-    if header < 20 || offset + header > packet.len() {
+    if header < 20 || offset + header > ip_end {
         return None;
     }
     offset += header;
@@ -238,9 +297,10 @@ fn decode_loopback(packet: &[u8]) -> Option<Segment> {
         source_port,
         destination_port,
         sequence,
-        payload: packet[offset..].to_vec(),
+        payload: packet[offset..ip_end].to_vec(),
         fin: tcp[13] & 1 != 0,
         syn: tcp[13] & 2 != 0,
+        rst: tcp[13] & 4 != 0,
     })
 }
 
@@ -295,11 +355,11 @@ impl Direction {
                     let distance = data_sequence.wrapping_sub(next) as i32;
                     if distance < 0 {
                         let overlap = next.wrapping_sub(data_sequence) as usize;
-                        if overlap < payload.len() {
-                            self.pending
-                                .entry(next)
-                                .or_insert_with(|| payload[overlap..].to_vec());
+                        if overlap >= payload.len() {
+                            return true;
                         }
+                        self.ended = true;
+                        return false;
                     } else if distance == 0 {
                         self.bytes.extend_from_slice(payload);
                         self.next_sequence = Some(next.wrapping_add(payload.len() as u32));
@@ -372,12 +432,12 @@ impl Flow {
         }
     }
 
-    fn accept(
-        &mut self,
-        segment: Segment,
-        hosts: &[String],
-        port: u16,
-    ) -> Option<CapturedExchange> {
+    fn accept(&mut self, segment: Segment, port: u16) -> Vec<CapturedExchange> {
+        if segment.rst {
+            self.closed = true;
+            self.requests.clear();
+            return Vec::new();
+        }
         let request_direction = usize::from(self.first.port == port);
         let forward =
             segment.source == self.first.address && segment.source_port == self.first.port;
@@ -385,80 +445,143 @@ impl Flow {
         let direction = &mut self.directions[index];
         if !direction.push(segment.sequence, &segment.payload, segment.syn, segment.fin) {
             self.closed = true;
-            return None;
+            return Vec::new();
         }
-        let exchange = if !direction.saw_syn {
-            None
-        } else if index == request_direction {
+        let mut exchanges = Vec::new();
+        if direction.saw_syn && index == request_direction {
             while let Some(message) =
                 parse_message(&mut direction.bytes, true, direction.ended, None)
             {
-                let Some((method, target)) = message.start.split_once(' ') else {
-                    continue;
+                let Some((method, target)) = parse_request_line(&message.start) else {
+                    self.closed = true;
+                    break;
                 };
+                if method.eq_ignore_ascii_case("CONNECT")
+                    || message
+                        .headers
+                        .iter()
+                        .any(|(n, _)| n.eq_ignore_ascii_case("upgrade"))
+                {
+                    self.closed = true;
+                    break;
+                }
                 let host = message
                     .headers
                     .iter()
                     .find(|(name, _)| name.eq_ignore_ascii_case("host"))
                     .map(|(_, value)| value.clone())
                     .unwrap_or_else(|| format!("127.0.0.1:{port}"));
-                let filter_host = host_name(&host);
-                if !hosts.is_empty()
-                    && !hosts
-                        .iter()
-                        .any(|pattern| host_matches(pattern, filter_host))
-                {
-                    continue;
-                }
                 self.requests.push_back(Request {
-                    method: method.to_owned(),
-                    target: target.to_owned(),
+                    method,
+                    target,
                     host,
                     headers: message.headers,
                     body: message.body,
                     started: Instant::now(),
                     ts: now_ms(),
                 });
-                if self.requests.len() > 128 {
-                    self.requests.pop_front();
+            }
+        } else if index == request_direction {
+        } else if direction.saw_syn {
+            while let Some(method) = self.requests.front().map(|r| r.method.as_str()) {
+                let Some(message) =
+                    parse_message(&mut direction.bytes, false, direction.ended, Some(method))
+                else {
+                    break;
+                };
+                let Some(status_code) = parse_status_line(&message.start) else {
+                    self.closed = true;
+                    break;
+                };
+                if (100..200).contains(&status_code) && status_code != 101 {
+                    continue;
                 }
+                if status_code == 101 {
+                    self.closed = true;
+                    break;
+                }
+                let Some(request) = self.requests.pop_front() else {
+                    break;
+                };
+                let target =
+                    if request.target.starts_with('/') || request.target.starts_with("http://") {
+                        request.target.clone()
+                    } else {
+                        self.closed = true;
+                        break;
+                    };
+                let url = if target.starts_with("http://") {
+                    target
+                } else {
+                    format!("http://{}{}", request.host, target)
+                };
+                exchanges.push(CapturedExchange {
+                    method: request.method,
+                    url,
+                    req_headers: request.headers,
+                    req_body: request.body,
+                    status: Some(status_code),
+                    res_headers: message.headers,
+                    res_body: message.body,
+                    duration_ms: request.started.elapsed().as_millis() as u64,
+                    ts: request.ts,
+                    tunneled: false,
+                });
             }
-            None
-        } else {
-            let method = self.requests.front().map(|request| request.method.as_str());
-            let message = parse_message(&mut direction.bytes, false, direction.ended, method)?;
-            let status_code = message
-                .start
-                .split_whitespace()
-                .nth(1)?
-                .parse::<u16>()
-                .ok()?;
-            if (100..200).contains(&status_code) && status_code != 101 {
-                return None;
-            }
-            let request = self.requests.pop_front()?;
-            let url = if request.target.starts_with("http://") {
-                request.target.clone()
-            } else {
-                format!("http://{}{}", request.host, request.target)
-            };
-            let status = Some(status_code);
-            Some(CapturedExchange {
-                method: request.method,
-                url,
-                req_headers: request.headers,
-                req_body: request.body,
-                status,
-                res_headers: message.headers,
-                res_body: message.body,
-                duration_ms: request.started.elapsed().as_millis() as u64,
-                ts: request.ts,
-                tunneled: false,
-            })
-        };
+        }
+        let _ = direction;
+        self.account_bytes();
         self.closed |= self.directions.iter().all(|direction| direction.ended);
-        exchange
+        exchanges
     }
+
+    fn account_bytes(&mut self) {
+        let total: usize = self
+            .directions
+            .iter()
+            .map(|d| d.bytes.len() + d.pending.values().map(Vec::len).sum::<usize>())
+            .sum::<usize>()
+            + self
+                .requests
+                .iter()
+                .map(|r| r.body.as_ref().map_or(0, String::len))
+                .sum::<usize>();
+        if total > MAX_CAPTURE_BYTES {
+            self.closed = true;
+            self.requests.clear();
+            for d in &mut self.directions {
+                d.bytes.clear();
+                d.pending.clear();
+            }
+        }
+    }
+}
+
+fn parse_request_line(line: &str) -> Option<(String, String)> {
+    let mut p = line.split(' ');
+    let method = p.next()?;
+    let target = p.next()?;
+    let version = p.next()?;
+    if method.is_empty()
+        || target.is_empty()
+        || p.next().is_some()
+        || !version.starts_with("HTTP/1.")
+        || !matches!(version, "HTTP/1.0" | "HTTP/1.1")
+    {
+        return None;
+    }
+    Some((method.to_owned(), target.to_owned()))
+}
+fn parse_status_line(line: &str) -> Option<u16> {
+    let mut p = line.splitn(3, ' ');
+    if !matches!(p.next()?, "HTTP/1.0" | "HTTP/1.1") {
+        return None;
+    }
+    let n = p.next()?;
+    if n.len() != 3 || !n.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    n.parse().ok()
 }
 
 #[derive(Debug)]
@@ -487,6 +610,28 @@ fn parse_message(
         let (name, value) = line.split_once(':')?;
         headers.push((name.trim().to_owned(), value.trim().to_owned()));
     }
+    if headers
+        .iter()
+        .any(|(name, _)| name.is_empty() || name.bytes().any(|b| !(33..=126).contains(&b)))
+    {
+        bytes.clear();
+        return None;
+    }
+    let chunked_headers: Vec<_> = headers
+        .iter()
+        .filter(|(name, _)| name.eq_ignore_ascii_case("transfer-encoding"))
+        .collect();
+    let length_headers: Vec<_> = headers
+        .iter()
+        .filter(|(name, _)| name.eq_ignore_ascii_case("content-length"))
+        .collect();
+    if chunked_headers.len() > 1
+        || length_headers.len() > 1
+        || (!chunked_headers.is_empty() && !length_headers.is_empty())
+    {
+        bytes.clear();
+        return None;
+    }
     let chunked = headers.iter().any(|(name, value)| {
         name.eq_ignore_ascii_case("transfer-encoding")
             && value
@@ -498,6 +643,10 @@ fn parse_message(
         .iter()
         .find(|(name, _)| name.eq_ignore_ascii_case("content-length"))
         .and_then(|(_, value)| value.parse::<usize>().ok());
+    if !length_headers.is_empty() && length.is_none() {
+        bytes.clear();
+        return None;
+    }
     let body_start = header_end + 4;
     let no_body = !request && (request_method == Some("HEAD") || status_has_no_body(&start));
     let body_end = if no_body {
