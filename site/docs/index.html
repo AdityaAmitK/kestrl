@@ -45,7 +45,7 @@ cd kestrl
 cargo install --path crates/kestrl-cli</code></pre><div class="copy-row"><button class="copy-button" type="button" data-copy>Copy</button></div></div>
       <p>Build the macOS app and its Rust framework with <code>scripts/build-app.sh</code>.</p>
       <p class="note">The macOS app is not notarized yet. On first launch, open System Settings ▸ Privacy &amp; Security and choose Open Anyway.</p>
-      <h2>Workspace layout</h2><p>A workspace is a repository with a <code>.kestrl/</code> directory. Requests and workspace configuration are plain TOML and can be reviewed or shared through git.</p>
+      <h2>Workspace layout</h2><p>A workspace is a folder, usually your project repository, with a <code>.kestrl/</code> directory. Requests and workspace configuration are plain TOML and can be reviewed or shared through git.</p>
       <div class="code-block"><pre><code>.kestrl/
   kestrl.toml
   envs/local.toml
@@ -53,9 +53,9 @@ cargo install --path crates/kestrl-cli</code></pre><div class="copy-row"><button
   connections/main.toml
 requests/
   auth/login.req.toml</code></pre><div class="copy-row"><button class="copy-button" type="button" data-copy>Copy</button></div></div>
-      <h2>Your first request</h2><p>Store a credential in the macOS Keychain, then send a request file against the <code>local</code> environment. The value is resolved when the request runs.</p>
-      <div class="code-block"><pre><code>kestrl secret set local_token
-kestrl send requests/auth/login.req.toml -e local</code></pre><div class="copy-row"><button class="copy-button" type="button" data-copy>Copy</button></div></div>
+      <h2>Your first request</h2><p>Run <code>kestrl init</code> in your project folder, or choose <strong>New workspace…</strong> in the app. This creates configuration, a local environment and a health request without overwriting existing files. Start your API on localhost:3000 before sending.</p>
+      <div class="code-block"><pre><code>kestrl init
+kestrl send requests/health.req.toml</code></pre><div class="copy-row"><button class="copy-button" type="button" data-copy>Copy</button></div></div>
       <p>When output is piped, the CLI prints JSON. A sent request is recorded in history, where you can search, inspect or replay it.</p>
       <h2>Continue</h2><div class="doc-index">
         <div><a href="concepts.html">Workspace concepts</a><p>Terms, files, precedence and retention.</p></div>

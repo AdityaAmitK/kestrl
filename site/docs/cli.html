@@ -29,6 +29,10 @@
     <article class="doc-content"><h1>CLI reference</h1><p class="lede">The commands and options below reflect <code>kestrl --help</code> and the nested command help. Global options can be placed before the command; repeatable options accept multiple values.</p>
       <h2>Global options</h2><table><thead><tr><th>Option</th><th>What it does</th></tr></thead><tbody><tr><td><code>--actor &lt;ACTOR&gt;</code></td><td>Set the actor recorded for this command. Recognized examples include <code>me</code>, <code>cursor</code>, <code>claude-code</code> and <code>codex</code>.</td></tr><tr><td><code>--json</code></td><td>Force JSON output. JSON is the default when stdout is not a terminal.</td></tr><tr><td><code>-h, --help</code></td><td>Print help.</td></tr><tr><td><code>-V, --version</code></td><td>Print version.</td></tr></tbody></table>
       <h2>Requests and workspace</h2>
+      <h3><code>init</code> — create a workspace</h3>
+      <p>Creates <code>.kestrl/kestrl.toml</code>, <code>.kestrl/envs/local.toml</code> and <code>requests/health.req.toml</code>. DIR defaults to the current directory and is created if missing. Existing workspaces or starter files are rejected without overwriting. JSON output includes created paths and next steps.</p>
+      <pre><code>kestrl init [DIR]
+kestrl init my-project --json</code></pre>
       <h3><code>send</code> — send one request</h3><p>Accepts a request file path, or an HTTP method followed by a URL.</p><pre><code>kestrl send [OPTIONS] &lt;TARGET&gt;...
 
 -e, --env &lt;ENV&gt;           Environment name

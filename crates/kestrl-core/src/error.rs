@@ -8,6 +8,16 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub enum Error {
     #[error("workspace not found from {0}")]
     WorkspaceNotFound(PathBuf),
+    /// Initialization refuses an existing workspace directory or entry.
+    #[error("workspace already exists at {path}")]
+    WorkspaceExists { path: PathBuf },
+    /// A workspace file or directory could not be created.
+    #[error("failed to write {path}: {source}")]
+    Write {
+        path: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
     #[error("failed to read {path}")]
     Read {
         path: PathBuf,

@@ -4,6 +4,9 @@ All notable changes are documented here. The format follows [Keep a Changelog](h
 
 ## [Unreleased]
 
+### Added
+- Workspace creation through `kestrl init [DIR]`, UniFFI and the app’s New Workspace command (⇧⌘N), with a local environment and starter health request. Opening an uninitialized folder offers to create a workspace. Existing files are never overwritten.
+
 ### Changed
 - Website adds agent-assisted CLI and skill setup, feature descriptions, and demo app and CLI views.
 - Release builds of the macOS app are universal (Apple Silicon and Intel).

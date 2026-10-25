@@ -26,6 +26,8 @@ impl From<kestrl_core::Error> for KestrlError {
         let message = error.to_string();
         match error {
             Error::WorkspaceNotFound(_)
+            | Error::WorkspaceExists { .. }
+            | Error::Write { .. }
             | Error::Read { .. }
             | Error::Toml { .. }
             | Error::Io(_) => Self::File { message },

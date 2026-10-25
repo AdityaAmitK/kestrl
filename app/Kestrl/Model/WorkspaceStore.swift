@@ -85,6 +85,7 @@ final class WorkspaceStore {
         get { requestDraft.url }
         set { requestDraft.url = newValue }
     }
+    var isShowingNewPanel = false
     var isShowingOpenPanel = false
     var isShowingComparison = false
     var isSettingSecret = false
@@ -151,6 +152,34 @@ final class WorkspaceStore {
 
     // MARK: Workspace
 
+    /// Choose or create a folder, initialize it, and select its starter request.
+    func chooseNewWorkspace() async {
+        let panel = NSOpenPanel()
+        panel.title = "New workspace"
+        panel.prompt = "Create"
+        panel.message = "Choose a folder for .kestrl configuration and requests."
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.canCreateDirectories = true
+        panel.allowsMultipleSelection = false
+        guard await panel.begin() == .OK, let url = panel.url else { return }
+        await createWorkspaceHere(url)
+    }
+
+    /// Create through the shared core before opening the starter request.
+    private func createWorkspaceHere(_ url: URL) async {
+        let path = url.path(percentEncoded: false)
+        do {
+            let info = try await KestrlBridge.run { try createWorkspace(path: path) }
+            applyWorkspace(info)
+            section = .requests
+            selectedRequest = "requests/health.req.toml"
+            await requestSelectionChanged()
+        } catch {
+            report(error)
+        }
+    }
+
     func chooseWorkspace() async {
         let panel = NSOpenPanel()
         panel.title = "Open workspace"
@@ -159,6 +188,16 @@ final class WorkspaceStore {
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false
         guard await panel.begin() == .OK, let url = panel.url else { return }
+        if !FileManager.default.fileExists(atPath: url.appendingPathComponent(".kestrl").path) {
+            let alert = NSAlert()
+            alert.messageText = "This folder isn't a Kestrl workspace"
+            alert.informativeText = "Create .kestrl configuration and a starter request in this folder."
+            alert.addButton(withTitle: "Create workspace here")
+            alert.addButton(withTitle: "Cancel")
+            guard alert.runModal() == .alertFirstButtonReturn else { return }
+            await createWorkspaceHere(url)
+            return
+        }
         await loadWorkspace(from: url)
     }
 
@@ -171,28 +210,33 @@ final class WorkspaceStore {
         let path = url.path(percentEncoded: false)
         do {
             let info = try await KestrlBridge.run { try openWorkspace(path: path) }
-            if workspace?.root != info.root {
-                response = nil
-                requestDetail = nil
-                requestBody = nil
-                eventDetail = nil
-                selectedRequest = nil
-                selectedEventIDs = []
-                resetDatabase()
-            }
-            workspace = info
-            requestTree = RequestNode.build(info.requests)
-            defaults.set(info.root, forKey: Self.lastWorkspaceKey)
-            if let selected = selectedRequest, !info.requests.contains(where: { $0.path == selected }) {
-                selectedRequest = nil
-            }
-            if !info.envs.contains(selectedEnvironment ?? "") {
-                selectedEnvironment = info.envs.contains(info.defaultEnv ?? "") ? info.defaultEnv : info.envs.first
-            }
-            errorMessage = nil
+            applyWorkspace(info)
         } catch {
             report(error)
         }
+    }
+
+    /// Apply workspace metadata consistently after opening or creating.
+    private func applyWorkspace(_ info: WorkspaceInfo) {
+        if workspace?.root != info.root {
+            response = nil
+            requestDetail = nil
+            requestBody = nil
+            eventDetail = nil
+            selectedRequest = nil
+            selectedEventIDs = []
+            resetDatabase()
+        }
+        workspace = info
+        requestTree = RequestNode.build(info.requests)
+        defaults.set(info.root, forKey: Self.lastWorkspaceKey)
+        if let selected = selectedRequest, !info.requests.contains(where: { $0.path == selected }) {
+            selectedRequest = nil
+        }
+        if !info.envs.contains(selectedEnvironment ?? "") {
+            selectedEnvironment = info.envs.contains(info.defaultEnv ?? "") ? info.defaultEnv : info.envs.first
+        }
+        errorMessage = nil
     }
 
     func reload() async {

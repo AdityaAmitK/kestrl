@@ -8,13 +8,23 @@ struct WelcomeView: View {
         ContentUnavailableView {
             Label("No workspace open", systemImage: "folder.badge.gearshape")
         } description: {
-            Text("Open a folder that contains a .kestrl directory to send requests and browse history.")
+            Text("A workspace is a folder, usually your project repo, holding .kestrl configuration and requests/.")
         } actions: {
-            Button("Open workspace…") {
-                store.isShowingOpenPanel = true
+            Button("New workspace…") {
+                store.isShowingNewPanel = true
             }
             .buttonStyle(.borderedProminent)
             .keyboardShortcut(.defaultAction)
+
+            Button("Open workspace…") {
+                store.isShowingOpenPanel = true
+            }
+            .buttonStyle(.bordered)
+        }
+        .safeAreaInset(edge: .bottom) {
+            if let message = store.errorMessage {
+                ErrorBanner(message: message) { store.dismissError() }
+            }
         }
     }
 }
