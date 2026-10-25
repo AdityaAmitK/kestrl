@@ -5,6 +5,8 @@ All notable changes are documented here. The format follows [Keep a Changelog](h
 ## [Unreleased]
 
 ### Added
+- Collections in the app: New Request, New Folder, Duplicate, Rename, Move to Trash and Reveal in Finder from the + menu and right-click; new requests are created as files and open immediately; empty folders show.
+- Collection folder settings (`folder.toml`): variables for every request inside, per-environment overrides, and a default environment, used by the CLI and the app (the toolbar switches to a folder's default environment).
 - Edit environments in the app: create (empty or as a copy), duplicate, rename, make default and delete environments; add, edit and remove variables with {{…}} highlighting and a resolved preview; add Keychain-backed secret variables. Edits are drafts until Save (⌘S), and switching away or quitting with unsaved edits asks first.
 - `kestrl envs new|set|unset|rename|rm|default` to manage environments from the CLI. Edits keep comments and order in the TOML files and write atomically.
 

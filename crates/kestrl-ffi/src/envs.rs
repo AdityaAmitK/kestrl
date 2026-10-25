@@ -25,24 +25,28 @@ pub struct VariableInfo {
     pub is_set: bool,
 }
 
-/// Effective variables and referenced secrets for request editing.
+/// Effective variables and referenced secrets for request editing; folder variables of
+/// `request_path` are included when given.
 #[uniffi::export]
 pub fn variable_catalog(
     workspace_root: String,
     env: Option<String>,
+    request_path: Option<String>,
 ) -> Result<Vec<VariableInfo>, KestrlError> {
-    Ok(
-        kestrl_core::env::variable_catalog(Path::new(&workspace_root), env.as_deref())?
-            .into_iter()
-            .map(|info| VariableInfo {
-                name: info.name,
-                source: info.source,
-                value: info.value,
-                is_secret: info.is_secret,
-                is_set: info.is_set,
-            })
-            .collect(),
-    )
+    Ok(kestrl_core::env::variable_catalog(
+        Path::new(&workspace_root),
+        env.as_deref(),
+        request_path.as_deref(),
+    )?
+    .into_iter()
+    .map(|info| VariableInfo {
+        name: info.name,
+        source: info.source,
+        value: info.value,
+        is_secret: info.is_secret,
+        is_set: info.is_set,
+    })
+    .collect())
 }
 
 /// The variables of `env` exactly as written in its file, in file order.

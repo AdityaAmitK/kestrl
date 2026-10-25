@@ -41,7 +41,7 @@ Each term means one thing and is used the same way in code, the CLI and the docs
 | Term | Meaning | Lives in |
 |---|---|---|
 | **Request file** | One saved request (`*.req.toml`) | Git |
-| **Collection** | A folder of request files | Git |
+| **Collection** | A folder of request files; its optional `folder.toml` adds variables and a default environment for every request inside | Git |
 | **Environment** | A named set of variables (`local`, `prod`) | Git |
 | **Variable** | `{{api_url}}`, with a value per environment | Git |
 | **Secret** | A variable whose value lives in the Keychain: `{{secret:name}}` | Keychain |
@@ -85,6 +85,7 @@ app/              SwiftUI macOS app; links kestrl-ffi as an XCFramework
 | Requests | `read_request_file(root, path)` → `RequestDetail`, the file as written, variables unresolved |
 | History | `list_events(filter)`, `show_event(id)`, `tag_event`, `untag_event`, `set_note`, `diff_events(a, b)` → JSON string |
 | Environments | `resolved_env(root, env)` → `[KeyValue]`, secrets masked; `variable_catalog(root, env)` → `[VariableInfo]`, effective environment/workspace values and referenced secret presence, never secret values; `environment_variables`, `save_environment_variables`, `create_environment(root, name, copy_from)`, `rename_environment`, `delete_environment`, `set_default_environment`, `validate_name(kind, name)` |
+| Collections | `create_folder(root, folder)`, `create_request(root, folder, name, method) -> path`, `duplicate_request(root, path) -> path`, `move_item(root, from, to)`, `read_folder_settings` / `save_folder_settings(root, folder, FolderSettingsRecord)`; `WorkspaceInfo.folders` lists folders including empty ones under `requests/`; `variable_catalog(root, env, request_path)` includes folder variables |
 | Profiles | `read_profile`, `save_profile(root, name, ProfileRecord)`, `create_profile(root, name, copy_from)`, `rename_profile`, `delete_profile` |
 | Secrets | `set_secret(name, value)`, `delete_secret(name)`, `secret_status(root)` → referenced ∪ stored names with `is_set` / `is_referenced`; presence is read from Keychain attributes only, so it never prompts |
 | Services and logs | `list_services()`, `read_logs(service, since_ms, grep, limit)`, `follow_logs(service, grep, sink) -> LogFollow` with `cancel()` |
@@ -104,6 +105,20 @@ Errors are one `KestrlError` enum: `File`, `Request`, `Secret`, `History`, `Inva
   connections/main.toml
 requests/
   auth/login.req.toml
+  payments/
+    folder.toml            # optional collection settings
+    charge.req.toml
+```
+
+`requests/payments/folder.toml`
+```toml
+default_env = "local"         # used when no environment is chosen
+
+[vars]                        # every environment
+api_url = "http://localhost:4100"
+
+[env.production.vars]         # only in production
+api_url = "https://payments.example.com"
 ```
 
 `envs/local.toml`
@@ -150,7 +165,7 @@ allow_writes = ["local"]      # read-only everywhere else
 url = "postgres://{{secret:db_local_user}}:{{secret:db_local_pass}}@localhost:5432/app"
 ```
 
-**Resolution order:** `--var k=v` > environment > workspace config. Request-file headers and query params are the base values; profiles override them in this order: those listed in the request file, then `-p` flags, then profiles whose `when` matches. Later values override earlier ones. Secrets resolve last.
+**Resolution order:** `--var k=v` > collection folder variables (nearest folder first; environment-specific before general) > environment > workspace config. The environment is `-e`, else the nearest folder's `default_env`, else the workspace default. Request-file headers and query params are the base values; profiles override them in this order: those listed in the request file, then `-p` flags, then profiles whose `when` matches. Later values override earlier ones. Secrets resolve last.
 
 ## Retention
 

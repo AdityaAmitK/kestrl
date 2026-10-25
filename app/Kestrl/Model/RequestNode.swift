@@ -8,12 +8,21 @@ struct RequestNode: Identifiable {
     let children: [RequestNode]?
 
     /// Groups request files by folder. Folders come first, then files, each sorted by name.
-    static func build(_ entries: [RequestEntry]) -> [RequestNode] {
+    /// `folders` adds folders that hold no requests yet, so new collections show up.
+    static func build(_ entries: [RequestEntry], folders: [String] = []) -> [RequestNode] {
         let root = FolderBuilder(path: "")
+        for folder in folders {
+            root.insertFolder(folder.split(separator: "/").map(String.init)[...])
+        }
         for entry in entries {
             root.insert(entry)
         }
         return root.nodes()
+    }
+
+    /// The workspace-relative folder path of a folder node ("folder:a/b" → "a/b").
+    var folderPath: String? {
+        request == nil ? String(id.dropFirst("folder:".count)) : nil
     }
 }
 
@@ -40,6 +49,13 @@ private final class FolderBuilder {
         let child = folders[first] ?? FolderBuilder(path: path.isEmpty ? first : "\(path)/\(first)")
         folders[first] = child
         child.insert(entry, parts: parts.dropFirst())
+    }
+
+    func insertFolder(_ parts: ArraySlice<String>) {
+        guard let first = parts.first else { return }
+        let child = folders[first] ?? FolderBuilder(path: path.isEmpty ? first : "\(path)/\(first)")
+        folders[first] = child
+        child.insertFolder(parts.dropFirst())
     }
 
     func nodes() -> [RequestNode] {

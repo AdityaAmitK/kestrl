@@ -1,5 +1,16 @@
 import SwiftUI
 
+/// Actions offered on rows of the request outline.
+enum CollectionAction {
+    case newRequest(folder: String)
+    case newFolder(parent: String)
+    case settings(folder: String)
+    case rename(path: String)
+    case duplicate(path: String)
+    case delete(path: String)
+    case reveal(path: String)
+}
+
 /// The request outline, flattened to the rows that are visible. Collapsed folders' children are
 /// simply not rendered, so a selected request inside a collapsed folder never lingers on screen
 /// (nested `DisclosureGroup`s in a selectable `List` leave such rows behind).
@@ -8,6 +19,7 @@ struct RequestTreeRows: View {
     let store: WorkspaceStore
     /// While searching, every folder shows its matches regardless of collapse state.
     var isFiltering = false
+    var onAction: (CollectionAction) -> Void = { _ in }
 
     private struct VisibleRow: Identifiable {
         let node: RequestNode
@@ -20,8 +32,10 @@ struct RequestTreeRows: View {
             if let request = row.node.request {
                 requestRow(row.node, request: request, depth: row.depth)
                     .tag(request.path)
+                    .contextMenu { requestMenu(request.path) }
             } else {
                 folderRow(row.node, depth: row.depth)
+                    .contextMenu { folderMenu(row.node.folderPath ?? "") }
             }
         }
     }
@@ -77,6 +91,26 @@ struct RequestTreeRows: View {
         .accessibilityLabel("Folder \(node.name)")
         .accessibilityValue(expanded ? "Expanded" : "Collapsed")
         .accessibilityAction { store.setFolder(node.id, expanded: !expanded) }
+    }
+
+    @ViewBuilder private func requestMenu(_ path: String) -> some View {
+        Button("Duplicate") { onAction(.duplicate(path: path)) }
+        Button("Rename…") { onAction(.rename(path: path)) }
+        Divider()
+        Button("Reveal in Finder") { onAction(.reveal(path: path)) }
+        Divider()
+        Button("Move to Trash…", role: .destructive) { onAction(.delete(path: path)) }
+    }
+
+    @ViewBuilder private func folderMenu(_ folder: String) -> some View {
+        Button("New Request…") { onAction(.newRequest(folder: folder)) }
+        Button("New Folder…") { onAction(.newFolder(parent: folder)) }
+        Divider()
+        Button("Folder Settings…") { onAction(.settings(folder: folder)) }
+        Button("Rename…") { onAction(.rename(path: folder)) }
+        Button("Reveal in Finder") { onAction(.reveal(path: folder)) }
+        Divider()
+        Button("Move to Trash…", role: .destructive) { onAction(.delete(path: folder)) }
     }
 
     private func indent(_ depth: Int) -> CGFloat { CGFloat(depth) * 14 }
