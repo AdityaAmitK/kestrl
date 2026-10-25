@@ -4,6 +4,8 @@ All notable changes are documented here. The format follows [Keep a Changelog](h
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-25
+
 ### Added
 - Static project website and documentation for installation, workspaces, CLI usage, agents and traffic capture.
 

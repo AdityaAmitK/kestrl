@@ -117,10 +117,10 @@
 
     <section class="section page" id="install">
       <div class="install-layout">
-        <div><h2>Start from source.</h2><p>Kestrl is open source and built for macOS. Install the CLI with Cargo, or build the native app from the repository.</p><p><a href="docs/index.html">Quick start and workspace setup →</a></p></div>
-        <div class="code-block"><pre><code>git clone https://github.com/AdityaAmitK/kestrl
-cd kestrl
-cargo install --path crates/kestrl-cli</code></pre><div class="copy-row"><button class="copy-button" type="button" data-copy>Copy</button></div><p>Build the app with <code>scripts/build-app.sh</code>.</p></div>
+        <div><h2>Install Kestrl.</h2><p>Install the standalone CLI or native macOS app. The CLI works without installing the app.</p><p><a href="docs/index.html">Quick start and workspace setup →</a></p></div>
+        <div class="code-block"><p>CLI</p><pre><code>curl -fsSL https://kestrl.adityakinjawadekar.com/install.sh | sh
+# or
+brew install adityaamitk/tap/kestrl</code></pre><p>App</p><pre><code>brew install --cask adityaamitk/tap/kestrl</code></pre><p><a href="https://github.com/AdityaAmitK/kestrl/releases">Download the DMG from GitHub Releases</a>.</p><p>The app is ad-hoc signed and not notarized. On first launch, use <strong>System Settings → Privacy &amp; Security → Open Anyway</strong> if macOS blocks it. You may need to allow Keychain access again after an update.</p><p>From source: <code>cargo install --path crates/kestrl-cli</code>; build the app with <code>scripts/build-app.sh</code>.</p></div>
       </div>
     </section>
   </main>
