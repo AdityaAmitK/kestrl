@@ -27,7 +27,7 @@ struct EnvironmentDetailView: View {
                 }
                 .overlay {
                     if store.resolvedVariables.isEmpty {
-                        ContentUnavailableView("No variables", systemImage: "list.bullet")
+                        EmptyPane("No variables", systemImage: "list.bullet")
                     }
                 }
 
@@ -38,7 +38,7 @@ struct EnvironmentDetailView: View {
                     .padding(.bottom, 12)
             }
         } else {
-            ContentUnavailableView(
+            EmptyPane(
                 "Select an environment",
                 systemImage: "globe",
                 description: Text("Its variables appear here.")

@@ -16,9 +16,11 @@ struct LogsContentView: View {
                 .tag(service.name)
             }
         }
+        .listStyle(.plain)
+        .environment(\.defaultMinListRowHeight, 26)
         .overlay {
             if store.services.isEmpty {
-                ContentUnavailableView(
+                EmptyPane(
                     "No services running",
                     systemImage: "text.alignleft",
                     description: Text("Start one with kestrl up api -- npm run dev. Its logs appear here.")

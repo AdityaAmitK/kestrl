@@ -62,7 +62,7 @@ struct LogLinesView: View {
         }
         .overlay {
             if store.logLines.isEmpty {
-                ContentUnavailableView(
+                EmptyPane(
                     store.logStatus == nil ? "Waiting for output" : "Not streaming",
                     systemImage: "text.alignleft",
                     description: Text(store.logStatus ?? "New lines appear here as the service writes them.")

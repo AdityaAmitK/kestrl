@@ -5,25 +5,23 @@ struct SecretsContentView: View {
     @Bindable var store: WorkspaceStore
 
     var body: some View {
-        Table(store.secrets, selection: $store.selectedSecret) {
-            TableColumn("Name") { secret in
-                Text(secret.name)
-                    .font(.body.monospaced())
+        List(selection: $store.selectedSecret) {
+            ForEach(store.secrets) { secret in
+                HStack {
+                    Label(secret.name, systemImage: "key")
+                        .lineLimit(1)
+                    Spacer()
+                    Image(systemName: secret.isSet ? "checkmark.circle" : "exclamationmark.circle")
+                        .foregroundStyle(.secondary)
+                        .help(secret.isSet ? "Set" : "Missing")
+                }
+                .tag(secret.name)
             }
-            .width(min: 140, ideal: 200)
-
-            TableColumn("Status") { secret in
-                Label(
-                    secret.isSet ? "Set" : "Missing",
-                    systemImage: secret.isSet ? "checkmark.circle" : "exclamationmark.circle"
-                )
-                .foregroundStyle(.secondary)
-            }
-            .width(min: 90, ideal: 110)
         }
+        .listStyle(.plain)
         .overlay {
             if store.secrets.isEmpty {
-                ContentUnavailableView(
+                EmptyPane(
                     "No secrets",
                     systemImage: "key",
                     description: Text("Use {{secret:name}} in a request or environment to add one.")

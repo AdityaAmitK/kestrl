@@ -10,6 +10,7 @@ All notable changes are documented here. The format follows [Keep a Changelog](h
 - Browser capture removes abandoned `kestrl-browser-*` temporary profiles when no browser process is using them; device and browser capture lines display full URLs without default HTTP(S) ports.
 
 ### Added
+- macOS workbench: compact pane headers and empty states, searchable request collection, persistent top request bar, syntax-colored response bodies, and on-demand table columns.
 - macOS app: Logs section streams a running service's log with a local-time gutter, stderr marking, pause-on-scroll, regex filter, and Copy and Clear.
 - macOS app: a JSON log line with `level` and `message` shows a level chip, the message, then its other keys as `key=value`. The raw line shows on hover and is what Copy copies.
 - macOS app: Database section lists connections and their tables, runs SQL with ⌘↩, shows results as a table with Copy JSON, and previews a table's columns.

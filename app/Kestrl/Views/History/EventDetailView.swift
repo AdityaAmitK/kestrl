@@ -83,7 +83,7 @@ struct EventDetailView: View {
                     emptyMessage: http.error ?? "The response had no body."
                 )
             } else {
-                ContentUnavailableView(
+                EmptyPane(
                     "No HTTP exchange",
                     systemImage: "doc",
                     description: Text(event.summary)

@@ -5,7 +5,7 @@ struct RequestBar: View {
     @Bindable var store: WorkspaceStore
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 6) {
             if store.selectedRequest == nil {
                 AdHocBar(store: store)
             } else if let detail = store.requestDetail {
@@ -30,7 +30,7 @@ struct RequestBar: View {
                 .foregroundStyle(.secondary)
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.vertical, 10)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.bar)
     }

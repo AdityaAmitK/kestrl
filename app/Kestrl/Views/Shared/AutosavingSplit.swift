@@ -11,7 +11,7 @@ struct PaneWidth {
     let maximum: CGFloat
 
     /// The list column beside a detail pane. Wide enough for names, narrow enough to leave the detail room.
-    static let content = PaneWidth(minimum: 220, ideal: 280, maximum: 420)
+    static let content = PaneWidth(minimum: 200, ideal: 240, maximum: 340)
 }
 
 /// Two panes with a draggable divider. The position is kept between launches under `autosaveName`.
@@ -54,9 +54,9 @@ struct AutosavingSplit<First: View, Second: View>: NSViewRepresentable {
         split.delegate = context.coordinator
 
         // Panes take the space the split gives them, not the size of their content.
-        let firstHost = NSHostingView(rootView: first)
+        let firstHost = NSHostingView(rootView: AnyView(first.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)))
         firstHost.sizingOptions = []
-        let secondHost = NSHostingView(rootView: second)
+        let secondHost = NSHostingView(rootView: AnyView(second.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)))
         secondHost.sizingOptions = []
         split.addSubview(firstHost)
         split.addSubview(secondHost)
@@ -74,14 +74,14 @@ struct AutosavingSplit<First: View, Second: View>: NSViewRepresentable {
     }
 
     func updateNSView(_ split: NSSplitView, context: Context) {
-        context.coordinator.firstHost?.rootView = first
-        context.coordinator.secondHost?.rootView = second
+        context.coordinator.firstHost?.rootView = AnyView(first.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading))
+        context.coordinator.secondHost?.rootView = AnyView(second.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading))
     }
 
     @MainActor
     final class Coordinator: NSObject, NSSplitViewDelegate {
-        var firstHost: NSHostingView<First>?
-        var secondHost: NSHostingView<Second>?
+        var firstHost: NSHostingView<AnyView>?
+        var secondHost: NSHostingView<AnyView>?
         var firstPaneMinimum = minimumPaneSize
         var firstPaneMaximum = CGFloat.greatestFiniteMagnitude
         var initialFraction: CGFloat = 0.5

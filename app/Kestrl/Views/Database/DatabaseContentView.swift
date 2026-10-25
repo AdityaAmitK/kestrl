@@ -20,9 +20,11 @@ struct DatabaseContentView: View {
                 }
             }
         }
+        .listStyle(.plain)
+        .environment(\.defaultMinListRowHeight, 26)
         .overlay {
             if store.connections.isEmpty {
-                ContentUnavailableView(
+                EmptyPane(
                     "No connections",
                     systemImage: "cylinder.split.1x2",
                     description: Text("Add a file under .kestrl/connections/ to connect a database.")

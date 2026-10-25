@@ -17,7 +17,7 @@ struct LogsDetailView: View {
                 await store.followSelectedService()
             }
         } else {
-            ContentUnavailableView(
+            EmptyPane(
                 "Select a service",
                 systemImage: "text.alignleft",
                 description: Text("Its live log appears here.")
@@ -26,13 +26,13 @@ struct LogsDetailView: View {
     }
 
     private func controls(for service: String) -> some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .top, spacing: 8) {
             Text(service)
                 .font(.headline)
                 .padding(.top, 4)
 
             VStack(alignment: .leading, spacing: 4) {
-                TextField("Filter lines with a regular expression", text: $store.logFilterText)
+                TextField("Filter lines (regex)", text: $store.logFilterText)
                     .textFieldStyle(.roundedBorder)
                     .frame(maxWidth: 320)
                     .accessibilityLabel("Filter lines")
@@ -48,6 +48,13 @@ struct LogsDetailView: View {
 
             Spacer()
 
+            Toggle(isOn: $store.wrapLogLines) {
+                Image(systemName: "text.word.spacing")
+            }
+            .toggleStyle(.button)
+            .help("Wrap log lines (⌥⌘W)")
+            .accessibilityLabel("Wrap log lines")
+
             Button("Copy", systemImage: "doc.on.doc") {
                 store.copySelectedLogLines()
             }
@@ -59,17 +66,19 @@ struct LogsDetailView: View {
             }
             .help("Clear the view. The service keeps running.")
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .controlSize(.small)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
     }
 
     private func footer(for service: String) -> some View {
-        Text(store.logStatus ?? "Following \(service) · \(store.logLines.count) lines")
+        Text(store.logStatus ?? "\(store.logsFollowing ? "Following" : "Paused") \(service) · \(store.logLines.count) \(store.logLines.count == 1 ? "line" : "lines")")
             .font(.caption)
             .foregroundStyle(.secondary)
             .monospacedDigit()
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 16)
+            .controlSize(.small)
+        .padding(.horizontal, 12)
             .padding(.vertical, 6)
     }
 }

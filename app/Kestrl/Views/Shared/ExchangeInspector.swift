@@ -16,7 +16,7 @@ struct ExchangeInspector: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(alignment: .leading, spacing: 0) {
             Picker("Show", selection: $part) {
                 ForEach(Part.allCases) { option in
                     Text(option.rawValue).tag(option)
@@ -25,7 +25,11 @@ struct ExchangeInspector: View {
             .pickerStyle(.segmented)
             .labelsHidden()
             .fixedSize()
-            .padding(10)
+            .controlSize(.small)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+
+            Divider()
 
             switch part {
             case .body:
@@ -40,13 +44,13 @@ struct ExchangeInspector: View {
         if let payload, !payload.text.isEmpty {
             JSONTextView(text: payload.text)
         } else {
-            ContentUnavailableView("No body", systemImage: "doc", description: Text(emptyMessage))
+            EmptyPane("No body", systemImage: "doc", description: Text(emptyMessage))
         }
     }
 
     @ViewBuilder private var headersContent: some View {
         if headers.isEmpty {
-            ContentUnavailableView("No headers", systemImage: "list.bullet")
+            EmptyPane("No headers", systemImage: "list.bullet")
         } else {
             ScrollView {
                 KeyValueGrid(title: "Headers", pairs: headers)
