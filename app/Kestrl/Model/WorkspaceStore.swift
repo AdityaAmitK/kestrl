@@ -122,7 +122,7 @@ final class WorkspaceStore {
         switch section {
         case .requests: return response != nil
         case .history: return eventDetail?.detail.http != nil
-        case .logs, .database, .environments, .secrets: return false
+        case .capture, .logs, .database, .environments, .secrets: return false
         }
     }
 
@@ -213,6 +213,8 @@ final class WorkspaceStore {
             break
         case .history:
             await refreshEvents()
+        case .capture:
+            break
         case .environments:
             if inspectedEnvironment == nil { inspectedEnvironment = selectedEnvironment }
             await loadResolvedVariables()
@@ -737,7 +739,7 @@ final class WorkspaceStore {
                 redacted: http.redacted,
                 error: http.error
             )
-        case .environments, .secrets, .logs, .database:
+        case .capture, .environments, .secrets, .logs, .database:
             return nil
         }
     }

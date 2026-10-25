@@ -1,6 +1,7 @@
 //! UniFFI bindings over `kestrl-core` for the SwiftUI app. Every function is a
 //! thin wrapper: it converts types and calls `kestrl-core`.
 
+mod capture;
 mod db;
 mod envs;
 mod error;
@@ -13,6 +14,10 @@ mod workspace;
 
 uniffi::setup_scaffolding!();
 
+pub use capture::{
+    BrowserCapture, BrowserCaptureOptions, CaptureBrowser, CaptureSink, CapturedExchange,
+    start_browser_capture,
+};
 pub use db::{
     ColumnInfo, QueryResultRecord, TableInfo, db_connections, db_describe, db_query, db_tables,
 };

@@ -5,6 +5,7 @@ mod launch;
 mod network;
 
 use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
 
 use crate::{Error, Result};
 
@@ -39,6 +40,8 @@ pub struct BrowserOptions {
     pub callback: Arc<dyn Fn(super::CapturedExchange) + Send + Sync>,
     /// Called after the isolated profile has been created.
     pub profile_callback: Arc<dyn Fn(&std::path::Path) + Send + Sync>,
+    /// Set to true to end capture. The browser is closed and its profile removed.
+    pub stop: Arc<AtomicBool>,
 }
 
 /// Launch a separate browser and capture its network traffic until it closes.
@@ -52,6 +55,7 @@ pub fn run(options: BrowserOptions) -> Result<std::path::PathBuf> {
         &options.hosts,
         options.url.as_deref(),
         &options.callback,
+        &options.stop,
     );
     process.close();
     result.map(|()| profile)
