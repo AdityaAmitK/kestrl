@@ -1,8 +1,7 @@
 //! HTTPS interception proxy lifecycle.
 
-use std::collections::HashSet;
 use std::io::Read;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Instant;
 
 use http_body_util::BodyExt;
@@ -34,7 +33,6 @@ struct CaptureHandler {
     callback: Arc<dyn Fn(CapturedExchange) + Send + Sync>,
     pending: Option<PendingExchange>,
     hosts: Vec<String>,
-    tunneled_hosts: Arc<Mutex<HashSet<String>>>,
 }
 
 #[derive(Clone)]
@@ -153,32 +151,23 @@ impl HttpHandler for CaptureHandler {
         client_hello: hudsucker::rustls::server::ClientHello<'_>,
     ) -> bool {
         let host = client_hello.server_name().unwrap_or_default().to_owned();
-        let should_intercept =
-            self.hosts.is_empty() || self.hosts.iter().any(|glob| host_matches(glob, &host));
-        if !should_intercept
-            && let Ok(mut tunneled_hosts) = self.tunneled_hosts.lock()
-            && tunneled_hosts.insert(host.clone())
-        {
-            (self.callback)(CapturedExchange {
-                method: "CONNECT".to_owned(),
-                url: format!("https://{host}"),
-                req_headers: Vec::new(),
-                req_body: None,
-                status: None,
-                res_headers: Vec::new(),
-                res_body: None,
-                duration_ms: 0,
-                ts: now_ms(),
-                tunneled: true,
-            });
-        }
-        should_intercept
+        // Excluded hosts pass through as TLS tunnels; they are not captured exchanges.
+        self.hosts.is_empty() || self.hosts.iter().any(|glob| host_matches(glob, &host))
     }
 }
 
 pub(crate) fn host_matches(pattern: &str, host: &str) -> bool {
-    let pattern = pattern.to_ascii_lowercase();
-    let host = host.to_ascii_lowercase();
+    let pattern = pattern.trim().trim_end_matches('.').to_ascii_lowercase();
+    let host = host.trim_end_matches('.').to_ascii_lowercase();
+    if pattern.is_empty() {
+        return false;
+    }
+    if !pattern.contains('*') {
+        return host == pattern
+            || host
+                .strip_suffix(&pattern)
+                .is_some_and(|prefix| prefix.ends_with('.'));
+    }
     let mut parts = pattern.split('*').peekable();
     let anchored_start = !pattern.starts_with('*');
     let anchored_end = !pattern.ends_with('*');
@@ -188,7 +177,12 @@ pub(crate) fn host_matches(pattern: &str, host: &str) -> bool {
         if part.is_empty() {
             continue;
         }
-        let Some(index) = remaining.find(part) else {
+        let position = if parts.peek().is_none() && anchored_end {
+            remaining.rfind(part)
+        } else {
+            remaining.find(part)
+        };
+        let Some(index) = position else {
             return false;
         };
         if first && anchored_start && index != 0 {
@@ -237,7 +231,6 @@ pub fn run(
         callback: options.callback,
         pending: None,
         hosts: options.hosts,
-        tunneled_hosts: Arc::new(Mutex::new(HashSet::new())),
     };
     let task = tokio::spawn(async move {
         let proxy = Proxy::builder()

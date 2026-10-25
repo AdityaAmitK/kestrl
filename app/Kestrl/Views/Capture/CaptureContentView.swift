@@ -39,11 +39,16 @@ struct CaptureContentView: View {
             sourceControls
             Group {
                 LabeledContent("Hosts") {
-                    TextField("", text: $capture.hostFilter, prompt: Text("All hosts. Or api.example.com, *.local"))
+                    TextField("", text: $capture.hostFilter, prompt: Text("All hosts, or example.com, *.local"))
                         .textFieldStyle(.roundedBorder)
                         .disabled(capture.isRunning)
                         .accessibilityLabel("Host filter")
+                        .help("Comma-separated domains or * patterns. A domain includes its subdomains. Applied when Start is pressed.")
                 }
+            }
+            if !capture.hostFilter.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Text("Domains include subdomains. Filters apply to the next capture.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
             LabeledContent("History") {
                 Toggle("Save each exchange", isOn: $capture.saveToHistory)
