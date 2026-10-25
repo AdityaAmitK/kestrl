@@ -28,7 +28,8 @@ struct RequestPane: View {
                         Text("Text").tag("text")
                         Text("Form").tag("form")
                     }
-                    .frame(width: 100)
+                    .labelsHidden().frame(width: 100)
+                    .help("Request body type")
                 }
             }
             .controlSize(.small).padding(.horizontal, 12).padding(.vertical, 7)
