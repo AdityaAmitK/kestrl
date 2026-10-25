@@ -4,6 +4,9 @@ All notable changes are documented here. The format follows [Keep a Changelog](h
 
 ## [Unreleased]
 
+### Added
+- Static project website and documentation for installation, workspaces, CLI usage, agents and traffic capture.
+
 ### Fixed
 - Capture host filters include subdomains for plain domains, correctly anchor wildcard suffixes, and omit excluded HTTPS tunnels from the capture list and history. The app clarifies when filters apply.
 - Device capture takes an exclusive, cross-process lock before it touches any device proxy setting. A second `kestrl capture` or app capture fails with a clear error instead of restoring the first capture's proxy.
