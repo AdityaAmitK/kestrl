@@ -6,6 +6,7 @@ pub mod capture;
 pub mod db;
 pub mod duration;
 pub mod env;
+pub mod env_files;
 pub mod error;
 pub mod history;
 pub mod http;

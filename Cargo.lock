@@ -1449,6 +1449,7 @@ dependencies = [
  "time",
  "tokio",
  "toml 0.8.23",
+ "toml_edit",
  "tungstenite 0.26.2",
  "ulid",
  "urlencoding",

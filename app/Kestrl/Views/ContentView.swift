@@ -41,20 +41,23 @@ struct ContentView: View {
         NavigationSplitView {
             SidebarView(store: store)
         } detail: {
-            sectionView
+            // The banner sits above the section, inside the detail column, so it pushes content down
+            // instead of covering pane headers and the sidebar.
+            VStack(spacing: 0) {
+                if let message = store.errorMessage {
+                    ErrorBanner(message: message) {
+                        store.dismissError()
+                    }
+                    Divider()
+                }
+                sectionView
+            }
         }
         .navigationSplitViewStyle(.balanced)
         .navigationTitle(store.section.title)
         .navigationSubtitle(workspaceName)
         .toolbar {
             toolbarItems
-        }
-        .safeAreaInset(edge: .top, spacing: 0) {
-            if let message = store.errorMessage {
-                ErrorBanner(message: message) {
-                    store.dismissError()
-                }
-            }
         }
         .task(id: store.section) {
             await store.sectionChanged()

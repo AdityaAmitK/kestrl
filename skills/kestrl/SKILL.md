@@ -25,6 +25,8 @@ Check it is available with `kestrl --version`. A workspace is any folder at or a
 ```sh
 kestrl envs                                   # environments in this workspace
 kestrl envs local                             # resolved variables (secrets masked)
+kestrl envs set local api_url=http://localhost:4000   # only when the user asks to change config
+kestrl envs new staging --from local          # duplicate an environment
 kestrl send requests/auth/login.req.toml -e local
 kestrl send GET '{{api_url}}/users' -e local  # ad hoc, variables still resolve
 kestrl send requests/admin/stats.req.toml -p admin --var user_id=42

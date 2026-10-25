@@ -4,6 +4,13 @@ All notable changes are documented here. The format follows [Keep a Changelog](h
 
 ## [Unreleased]
 
+### Added
+- Edit environments in the app: create (empty or as a copy), duplicate, rename, make default and delete environments; add, edit and remove variables with {{…}} highlighting and a resolved preview; add Keychain-backed secret variables. Edits are drafts until Save (⌘S), and switching away or quitting with unsaved edits asks first.
+- `kestrl envs new|set|unset|rename|rm|default` to manage environments from the CLI. Edits keep comments and order in the TOML files and write atomically.
+
+### Fixed
+- Error banners no longer cover pane headers and the sidebar.
+
 ## [0.1.1] - 2026-10-25
 
 ### Added

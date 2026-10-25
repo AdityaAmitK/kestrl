@@ -50,9 +50,14 @@ kestrl send GET '{{api_url}}/users' -e local --tag auth-check</code></pre><div c
     --var &lt;VARS&gt;          key=value; repeatable
     --actor &lt;ACTOR&gt;
     --json</code></pre><div class="copy-row"><button class="copy-button" type="button" data-copy>Copy</button></div>
-      <h3><code>envs</code> and <code>profiles</code></h3><p>List entries with no name, or show one entry by name. Resolved environment output masks secrets.</p><pre><code>kestrl envs [NAME]
-kestrl envs local
-kestrl profiles [NAME]
+      <h3><code>envs</code> — environments</h3><p>List environments, show one with resolved variables (secrets masked), or create and edit them. Edits keep comments in the file; the default environment follows a rename and cannot be deleted.</p><pre><code>kestrl envs [NAME]
+kestrl envs new staging --from local
+kestrl envs set staging api_url=https://staging.example.com
+kestrl envs unset staging debug
+kestrl envs rename staging stage
+kestrl envs default local
+kestrl envs rm stage</code></pre><div class="copy-row"><button class="copy-button" type="button" data-copy>Copy</button></div>
+      <h3><code>profiles</code></h3><p>List profiles, or show one by name.</p><pre><code>kestrl profiles [NAME]
 kestrl profiles admin</code></pre><div class="copy-row"><button class="copy-button" type="button" data-copy>Copy</button></div>
       <h3><code>secret</code> — manage Keychain values</h3><p>Subcommands: <code>set</code>, <code>rm</code> and <code>ls</code>. Set reads the value from stdin or a prompt; <code>ls</code> lists secrets referenced by the workspace.</p><pre><code>kestrl secret set local_token
 kestrl secret rm local_token
