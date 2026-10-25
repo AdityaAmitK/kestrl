@@ -62,6 +62,8 @@ jobs:
           tar -C dist/cli -czf "dist/kestrl-$VERSION-macos-universal.tar.gz" kestrl LICENSE-MIT LICENSE-APACHE README.md kestrl-bpf.sh
           cd dist
           shasum -a 256 "kestrl-$VERSION-macos-universal.tar.gz" > "kestrl-$VERSION-macos-universal.tar.gz.sha256"
+      - name: Install XcodeGen
+        run: brew install xcodegen
       - name: Build and package app
         env:
           VERSION: ${{ steps.release.outputs.version }}
