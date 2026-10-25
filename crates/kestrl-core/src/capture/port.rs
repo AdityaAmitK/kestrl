@@ -17,7 +17,8 @@ const MAX_FLOWS: usize = 16;
 const MAX_STREAM_BYTES: usize = 1024 * 1024 + 64 * 1024;
 const MAX_HEADER_BYTES: usize = 64 * 1024;
 const MAX_BODY_BYTES: usize = 1024 * 1024;
-const MAX_CAPTURE_BYTES: usize = 8 * 1024 * 1024;
+const MAX_CAPTURE_BYTES: usize = 4 * 1024 * 1024;
+const MAX_TOTAL_BYTES: usize = 16 * 1024 * 1024;
 
 type Callback = Arc<dyn Fn(CapturedExchange) + Send + Sync>;
 
@@ -56,7 +57,12 @@ pub fn run_cancellable(
         .timeout(250)
         .open()
         .map_err(|error| Error::Capture(format!("cannot open macOS loopback packet capture: {error}. BPF access requires a privileged setup; run `kestrl capture port setup` for the current setup status.")))?;
-    let mut device = device;
+    if device.get_datalink() != pcap::Linktype::NULL {
+        return Err(Error::Capture(
+            "unsupported loopback packet link type".to_owned(),
+        ));
+    }
+    let mut device = device.setnonblock().map_err(capture_error)?;
     device
         .filter(
             &format!("tcp and port {port} and (host 127.0.0.1 or host ::1)"),
@@ -68,6 +74,8 @@ pub fn run_cancellable(
         if cancelled.load(Ordering::Relaxed) {
             return Ok(());
         }
+        let cutoff = Instant::now() - Duration::from_secs(60);
+        flows.retain(|_, flow| flow.last_seen >= cutoff);
         match device.next_packet() {
             Ok(packet) => {
                 if let Some(segment) = decode_loopback(packet.data) {
@@ -108,11 +116,13 @@ pub fn run_cancellable(
                     if flow_closed {
                         flows.remove(&key);
                     }
+                    if flows.values().map(Flow::buffered_bytes).sum::<usize>() > MAX_TOTAL_BYTES {
+                        flows.clear();
+                    }
                 }
             }
-            Err(pcap::Error::TimeoutExpired) => {
-                let cutoff = Instant::now() - Duration::from_secs(60);
-                flows.retain(|_, flow| flow.last_seen >= cutoff);
+            Err(pcap::Error::TimeoutExpired | pcap::Error::NoMorePackets) => {
+                std::thread::sleep(Duration::from_millis(10));
             }
             Err(error) => {
                 return Err(Error::Capture(format!(
@@ -476,9 +486,16 @@ impl Flow {
         }
         let mut exchanges = Vec::new();
         if direction.saw_syn && index == request_direction {
-            while let Some(message) =
-                parse_message(&mut direction.bytes, true, direction.ended, None)
-            {
+            loop {
+                let had_bytes = !direction.bytes.is_empty();
+                let Some(message) =
+                    parse_message(&mut direction.bytes, true, direction.ended, None)
+                else {
+                    if had_bytes && direction.bytes.is_empty() {
+                        self.closed = true;
+                    }
+                    break;
+                };
                 let Some((method, target)) = parse_request_line(&message.start) else {
                     self.closed = true;
                     break;
@@ -498,6 +515,10 @@ impl Flow {
                     .find(|(name, _)| name.eq_ignore_ascii_case("host"))
                     .map(|(_, value)| value.clone())
                     .unwrap_or_else(|| format!("127.0.0.1:{port}"));
+                if self.requests.len() >= 128 {
+                    self.closed = true;
+                    break;
+                }
                 self.requests.push_back(Request {
                     method,
                     target,
@@ -511,9 +532,13 @@ impl Flow {
         } else if index == request_direction {
         } else if direction.saw_syn {
             while let Some(method) = self.requests.front().map(|r| r.method.as_str()) {
+                let had_bytes = !direction.bytes.is_empty();
                 let Some(message) =
                     parse_message(&mut direction.bytes, false, direction.ended, Some(method))
                 else {
+                    if had_bytes && direction.bytes.is_empty() {
+                        self.closed = true;
+                    }
                     break;
                 };
                 let Some(status_code) = parse_status_line(&message.start) else {
@@ -563,16 +588,7 @@ impl Flow {
     }
 
     fn account_bytes(&mut self) {
-        let total: usize = self
-            .directions
-            .iter()
-            .map(|d| d.bytes.len() + d.pending.values().map(Vec::len).sum::<usize>())
-            .sum::<usize>()
-            + self
-                .requests
-                .iter()
-                .map(|r| r.body.as_ref().map_or(0, String::len))
-                .sum::<usize>();
+        let total = self.buffered_bytes();
         if total > MAX_CAPTURE_BYTES {
             self.closed = true;
             self.requests.clear();
@@ -581,6 +597,27 @@ impl Flow {
                 d.pending.clear();
             }
         }
+    }
+
+    fn buffered_bytes(&self) -> usize {
+        self.directions
+            .iter()
+            .map(|d| d.bytes.len() + d.pending.values().map(Vec::len).sum::<usize>())
+            .sum::<usize>()
+            + self
+                .requests
+                .iter()
+                .map(|r| {
+                    r.body.as_ref().map_or(0, String::len)
+                        + r.method.len()
+                        + r.target.len()
+                        + r.host.len()
+                        + r.headers
+                            .iter()
+                            .map(|(key, value)| key.len() + value.len())
+                            .sum::<usize>()
+                })
+                .sum::<usize>()
     }
 }
 
@@ -608,7 +645,7 @@ fn parse_status_line(line: &str) -> Option<u16> {
     if n.len() != 3 || !n.bytes().all(|b| b.is_ascii_digit()) {
         return None;
     }
-    n.parse().ok()
+    n.parse::<u16>().ok().filter(|status| *status >= 100)
 }
 
 #[derive(Debug)]
@@ -635,7 +672,15 @@ fn parse_message(
     let mut headers = Vec::new();
     for line in lines {
         let (name, value) = line.split_once(':')?;
-        headers.push((name.trim().to_owned(), value.trim().to_owned()));
+        if name.is_empty()
+            || !name
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || b"!#$%&'*+-.^_`|~".contains(&byte))
+        {
+            bytes.clear();
+            return None;
+        }
+        headers.push((name.to_owned(), value.trim().to_owned()));
     }
     if headers
         .iter()
@@ -655,6 +700,13 @@ fn parse_message(
     if chunked_headers.len() > 1
         || length_headers.len() > 1
         || (!chunked_headers.is_empty() && !length_headers.is_empty())
+    {
+        bytes.clear();
+        return None;
+    }
+    if chunked_headers
+        .first()
+        .is_some_and(|(_, value)| !value.trim().eq_ignore_ascii_case("chunked"))
     {
         bytes.clear();
         return None;
@@ -769,7 +821,7 @@ fn chunked_end(bytes: &[u8]) -> Option<Option<usize>> {
             }
         }
         offset = offset.checked_add(size)?;
-        if bytes.get(offset..offset + 2)? != b"\r\n" {
+        if bytes.get(offset..offset.checked_add(2)?)? != b"\r\n" {
             return None;
         }
         offset += 2;
