@@ -4,6 +4,8 @@ All notable changes are documented here. The format follows [Keep a Changelog](h
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-25
+
 ### Added
 - Workspace creation through `kestrl init [DIR]`, UniFFI and the app’s New Workspace command (⇧⌘N), with a local environment and starter health request. Opening an uninitialized folder offers to create a workspace. Existing files are never overwritten.
 - macOS request fields highlight variables, secret references and undefined names, with fast hover cards and caret-anchored `{{` completions showing resolved values and secret presence.
