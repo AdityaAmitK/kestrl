@@ -10,6 +10,13 @@
     <nav class="doc-nav" aria-label="Documentation"><a href="index.html" aria-current="page">Quick start</a><a href="concepts.html">Concepts</a><a href="cli.html">CLI reference</a><a href="agents.html">Agents</a><a href="capture.html">Capture</a></nav>
     <article class="doc-content">
       <h1>Documentation</h1><p class="lede">Install the CLI, make a workspace, then send a request. Kestrl keeps project configuration in files and history on your Mac.</p>
+      <h2>Install</h2><p>The CLI is standalone and does not require the app. Install it with the shell installer or Homebrew:</p>
+      <div class="code-block"><pre><code>curl -fsSL https://kestrl.adityakinjawadekar.com/install.sh | sh
+# or
+brew install adityaamitk/tap/kestrl</code></pre><div class="copy-row"><button class="copy-button" type="button" data-copy>Copy</button></div></div>
+      <p>Install the macOS app with Homebrew, or download the DMG from <a href="https://github.com/AdityaAmitK/kestrl/releases">GitHub Releases</a>:</p>
+      <div class="code-block"><pre><code>brew install --cask adityaamitk/tap/kestrl</code></pre><div class="copy-row"><button class="copy-button" type="button" data-copy>Copy</button></div></div>
+      <p>The app is ad-hoc signed and not notarized. If macOS blocks its first launch, open <strong>System Settings → Privacy &amp; Security</strong> and choose <strong>Open Anyway</strong>. Updating the app may prompt again for Keychain access.</p>
       <h2>Install from source</h2><p>Kestrl currently targets macOS and requires stable Rust for the CLI build.</p>
       <div class="code-block"><pre><code>git clone https://github.com/AdityaAmitK/kestrl
 cd kestrl

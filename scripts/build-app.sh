@@ -1,7 +1,17 @@
 #!/usr/bin/env bash
 # Build the Kestrl macOS app: kestrl-ffi as an XCFramework, the Xcode project, then the app.
-# Prints the path of the Debug .app when it is done.
+# Pass --release to build the Release .app; defaults to Debug.
 set -euo pipefail
+
+CONFIGURATION=Debug
+if [[ "${1:-}" == "--release" ]]; then
+    CONFIGURATION=Release
+    shift
+fi
+if (( $# != 0 )); then
+    echo "Usage: $0 [--release]" >&2
+    exit 2
+fi
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
@@ -20,10 +30,10 @@ step "Generating the Xcode project"
 xcodegen generate --spec "$ROOT/app/project.yml"
 
 DERIVED="$ROOT/target/app"
-step "Building Kestrl (Debug)"
-xcodebuild -project "$ROOT/app/Kestrl.xcodeproj" -scheme Kestrl -configuration Debug \
+step "Building Kestrl ($CONFIGURATION)"
+xcodebuild -project "$ROOT/app/Kestrl.xcodeproj" -scheme Kestrl -configuration "$CONFIGURATION" \
     -derivedDataPath "$DERIVED" -quiet build
 
-APP="$DERIVED/Build/Products/Debug/Kestrl.app"
+APP="$DERIVED/Build/Products/$CONFIGURATION/Kestrl.app"
 step "Built"
 echo "$APP"

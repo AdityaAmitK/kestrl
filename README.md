@@ -6,7 +6,26 @@ Kestrl puts an API client, request history, service logs, a Postgres console and
 
 > **Status:** early development. See [PLAN.md](PLAN.md) for the design and roadmap.
 
-## Install (from source)
+## Install
+
+Install the standalone CLI with the shell installer:
+
+```sh
+curl -fsSL https://kestrl.adityakinjawadekar.com/install.sh | sh
+```
+
+Or install the CLI or macOS app with Homebrew:
+
+```sh
+brew install adityaamitk/tap/kestrl
+brew install --cask adityaamitk/tap/kestrl
+```
+
+The app is also available as `Kestrl-<version>.dmg` on [GitHub Releases](https://github.com/AdityaAmitK/kestrl/releases).
+
+The app and CLI are ad-hoc signed, not notarized. On first launch, macOS may block the app; open **System Settings → Privacy & Security** and choose **Open Anyway**. You can also remove its quarantine attribute with `xattr -dr com.apple.quarantine /Applications/Kestrl.app`. Updating the app may prompt again for Keychain access.
+
+## Install from source
 
 Requires Rust (stable) and macOS.
 
