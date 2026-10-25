@@ -18,6 +18,7 @@ Or install the CLI or macOS app with Homebrew:
 
 ```sh
 brew install adityaamitk/tap/kestrl
+brew trust adityaamitk/tap   # once; Homebrew requires it for third-party casks
 brew install --cask adityaamitk/tap/kestrl
 ```
 

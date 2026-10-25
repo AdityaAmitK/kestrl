@@ -4,6 +4,9 @@ All notable changes are documented here. The format follows [Keep a Changelog](h
 
 ## [Unreleased]
 
+### Changed
+- Release builds of the macOS app are universal (Apple Silicon and Intel).
+
 ## [0.1.0] - 2026-10-25
 
 ### Added
