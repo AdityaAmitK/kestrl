@@ -13,7 +13,7 @@ struct SidebarView: View {
                     }
                 }
                 Section("Workspace") {
-                    ForEach([SidebarSection.environments, .secrets]) { section in
+                    ForEach([SidebarSection.environments, .profiles, .secrets]) { section in
                         Label(section.title, systemImage: section.symbol).tag(section)
                     }
                 }

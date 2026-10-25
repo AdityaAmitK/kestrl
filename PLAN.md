@@ -84,10 +84,11 @@ app/              SwiftUI macOS app; links kestrl-ffi as an XCFramework
 | Requests | `send_request_draft(root, draft, env)`, `save_request_draft(root, path, draft)` — unresolved drafts use the shared send path; explicit atomic saves reject external changes |
 | Requests | `read_request_file(root, path)` → `RequestDetail`, the file as written, variables unresolved |
 | History | `list_events(filter)`, `show_event(id)`, `tag_event`, `untag_event`, `set_note`, `diff_events(a, b)` → JSON string |
-| Environments | `resolved_env(root, env)` → `[KeyValue]`, secrets masked; `variable_catalog(root, env)` → `[VariableInfo]`, effective environment/workspace values and referenced secret presence, never secret values |
-| Secrets | `set_secret(name, value)`, `delete_secret(name)`, `secret_status(root)` |
+| Environments | `resolved_env(root, env)` → `[KeyValue]`, secrets masked; `variable_catalog(root, env)` → `[VariableInfo]`, effective environment/workspace values and referenced secret presence, never secret values; `environment_variables`, `save_environment_variables`, `create_environment(root, name, copy_from)`, `rename_environment`, `delete_environment`, `set_default_environment`, `validate_name(kind, name)` |
+| Profiles | `read_profile`, `save_profile(root, name, ProfileRecord)`, `create_profile(root, name, copy_from)`, `rename_profile`, `delete_profile` |
+| Secrets | `set_secret(name, value)`, `delete_secret(name)`, `secret_status(root)` → referenced ∪ stored names with `is_set` / `is_referenced`; presence is read from Keychain attributes only, so it never prompts |
 | Services and logs | `list_services()`, `read_logs(service, since_ms, grep, limit)`, `follow_logs(service, grep, sink) -> LogFollow` with `cancel()` |
-| Database | `db_connections(root)`, `db_query(root, connection, env, sql)`, `db_tables(root, connection, env)`, `db_describe(root, connection, env, table)` |
+| Database | `db_connections(root)`, `db_query(root, connection, env, sql)`, `db_tables(root, connection, env)`, `db_describe(root, connection, env, table)`; `connection_kinds()`, `read_connection`, `save_connection(root, name, previous, ConnectionRecord)` (create, edit or rename), `delete_connection` |
 | Capture | `start_browser_capture`, `start_port_capture`, `start_device_capture` → `CaptureHandle` with `stop()`. Options select the workspace, source, host filters and history recording; the sink receives redacted, numbered exchanges and `on_end(error)`. Readiness helpers report BPF and device availability. |
 
 Errors are one `KestrlError` enum: `File`, `Request`, `Secret`, `History`, `InvalidInput`, each with a `message`. Capture reports asynchronous errors through `on_end`; startup validation can throw. Browser, port and device capture share a cancellable handle.

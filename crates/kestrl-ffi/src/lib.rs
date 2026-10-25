@@ -6,6 +6,7 @@ mod db;
 mod envs;
 mod error;
 mod history;
+mod profiles;
 mod requests;
 mod secrets;
 mod services;
@@ -21,7 +22,8 @@ pub use capture::{
     start_device_capture, start_port_capture,
 };
 pub use db::{
-    ColumnInfo, QueryResultRecord, TableInfo, db_connections, db_describe, db_query, db_tables,
+    ColumnInfo, ConnectionRecord, QueryResultRecord, TableInfo, connection_kinds, db_connections,
+    db_describe, db_query, db_tables, delete_connection, read_connection, save_connection,
 };
 pub use envs::{
     VariableInfo, create_environment, delete_environment, environment_variables,
@@ -32,6 +34,9 @@ pub use error::KestrlError;
 pub use history::{
     EventDetail, EventFilter, EventSummary, HttpExchange, diff_events, list_events, set_note,
     show_event, tag_event, untag_event,
+};
+pub use profiles::{
+    ProfileRecord, create_profile, delete_profile, read_profile, rename_profile, save_profile,
 };
 pub use requests::{
     RequestDetail, SentExchange, read_request_file, save_request_draft, send_ad_hoc,

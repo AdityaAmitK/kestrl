@@ -1,9 +1,25 @@
 import SwiftUI
 
-/// Name a new, duplicated or renamed environment. New environments can start empty or as a copy.
-struct EnvironmentNameSheet: View {
-    let store: WorkspaceStore
-    let intent: EnvironmentNameIntent
+/// What a name sheet names: wording, where the file lives, and what already exists.
+struct NameSheetKind {
+    /// Lowercase noun, e.g. "environment"
+    let noun: String
+    /// `validateName(kind:)` kind; file-backed kinds share the same rules
+    let validationKind: String
+    /// Directory under the workspace root, e.g. ".kestrl/envs"
+    let directory: String
+    let existing: [String]
+    let explanation: (NameIntent) -> String
+    /// Placeholder for the name field
+    var example = "staging"
+}
+
+/// Name a new, duplicated or renamed item. New items can start empty or as a copy of another.
+struct NameSheet: View {
+    let kind: NameSheetKind
+    let intent: NameIntent
+    /// Creates, duplicates or renames; returns true when the sheet can close.
+    let commit: (_ name: String, _ copyFrom: String?) async -> Bool
 
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""
@@ -11,32 +27,27 @@ struct EnvironmentNameSheet: View {
     @State private var isWorking = false
     @FocusState private var isNameFocused: Bool
 
-    private var editor: EnvironmentEditor { store.environmentEditor }
-    private var problem: String? { editor.nameProblem(name, intent: intent) }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(title).font(.headline)
-                Text(explanation)
+                Text(kind.explanation(intent))
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
             Form {
-                TextField("Name", text: $name, prompt: Text("staging"))
+                TextField("Name", text: $name, prompt: Text(kind.example))
                     .focused($isNameFocused)
-                    .onSubmit(commit)
-                    .accessibilityLabel("Environment name")
-                if intent == .create {
+                    .onSubmit(save)
+                    .accessibilityLabel("\(kind.noun.capitalized) name")
+                if intent == .create, !kind.existing.isEmpty {
                     Picker("Start from", selection: $copyFrom) {
                         Text("Empty").tag(String?.none)
-                        if !(store.workspace?.envs.isEmpty ?? true) {
-                            Divider()
-                            ForEach(store.workspace?.envs ?? [], id: \.self) { env in
-                                Text("Copy of \(env)").tag(Optional(env))
-                            }
+                        Divider()
+                        ForEach(kind.existing, id: \.self) { item in
+                            Text("Copy of \(item)").tag(Optional(item))
                         }
                     }
                 }
@@ -48,7 +59,7 @@ struct EnvironmentNameSheet: View {
                     Label(problem, systemImage: "exclamationmark.triangle")
                         .foregroundStyle(.orange)
                 } else {
-                    Text("Saved as .kestrl/envs/\(trimmedName.isEmpty ? "name" : trimmedName).toml")
+                    Text("Saved as \(kind.directory)/\(trimmedName.isEmpty ? "name" : trimmedName).toml")
                         .foregroundStyle(.secondary)
                 }
             }
@@ -58,7 +69,7 @@ struct EnvironmentNameSheet: View {
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }
                     .keyboardShortcut(.cancelAction)
-                Button(actionTitle, action: commit)
+                Button(actionTitle, action: save)
                     .keyboardShortcut(.defaultAction)
                     .disabled(problem != nil || isWorking)
             }
@@ -70,19 +81,19 @@ struct EnvironmentNameSheet: View {
 
     private var trimmedName: String { name.trimmingCharacters(in: .whitespaces) }
 
-    private var title: String {
-        switch intent {
-        case .create: return "New environment"
-        case .duplicate(let source): return "Duplicate \"\(source)\""
-        case .rename(let current): return "Rename \"\(current)\""
-        }
+    private var problem: String? {
+        if trimmedName.isEmpty { return "Enter a name." }
+        if let problem = validateName(kind: kind.validationKind, name: trimmedName) { return problem }
+        if case .rename(let current) = intent, current == trimmedName { return nil }
+        if kind.existing.contains(trimmedName) { return "A \(kind.noun) named \"\(trimmedName)\" already exists." }
+        return nil
     }
 
-    private var explanation: String {
+    private var title: String {
         switch intent {
-        case .create: return "An environment is a set of variables, such as api_url, that requests resolve when you send them."
-        case .duplicate: return "The copy keeps every variable and comment. Secret values stay in the Keychain and are shared."
-        case .rename: return "Requests keep working. If this is the default environment, the default follows the new name."
+        case .create: return "New \(kind.noun)"
+        case .duplicate(let source): return "Duplicate \"\(source)\""
+        case .rename(let current): return "Rename \"\(current)\""
         }
     }
 
@@ -108,19 +119,22 @@ struct EnvironmentNameSheet: View {
     }
 
     private func uniqueName(base: String) -> String {
-        let existing = Set(store.workspace?.envs ?? [])
-        guard existing.contains(base) else { return base }
+        guard kind.existing.contains(base) else { return base }
         var number = 2
-        while existing.contains("\(base)-\(number)") { number += 1 }
+        while kind.existing.contains("\(base)-\(number)") { number += 1 }
         return "\(base)-\(number)"
     }
 
-    private func commit() {
+    private func save() {
         guard problem == nil, !isWorking else { return }
         isWorking = true
-        let source = copyFrom
+        let source: String? = switch intent {
+        case .duplicate(let source): source
+        default: copyFrom
+        }
+        let target = trimmedName
         Task {
-            let isDone = await editor.commitName(name, intent: intent, copyFrom: source)
+            let isDone = await commit(target, source)
             isWorking = false
             if isDone { dismiss() }
         }

@@ -6,6 +6,7 @@ enum SidebarSection: String, CaseIterable, Identifiable, Hashable {
     case logs
     case database
     case environments
+    case profiles
     case secrets
 
     var id: Self { self }
@@ -18,6 +19,7 @@ enum SidebarSection: String, CaseIterable, Identifiable, Hashable {
         case .logs: return "Logs"
         case .database: return "Database"
         case .environments: return "Environments"
+        case .profiles: return "Profiles"
         case .secrets: return "Secrets"
         }
     }
@@ -30,6 +32,7 @@ enum SidebarSection: String, CaseIterable, Identifiable, Hashable {
         case .logs: return "text.alignleft"
         case .database: return "cylinder.split.1x2"
         case .environments: return "globe"
+        case .profiles: return "slider.horizontal.3"
         case .secrets: return "key"
         }
     }

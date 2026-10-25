@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The selected secret: its status, and the actions to set or remove it. Values are never shown.
+/// The selected secret: its status, where it is used, and set / replace / remove. Values are never shown.
 struct SecretDetailView: View {
     @Bindable var store: WorkspaceStore
 
@@ -8,34 +8,52 @@ struct SecretDetailView: View {
 
     var body: some View {
         if let name = store.selectedSecret, let secret = store.secrets.first(where: { $0.name == name }) {
-            VStack(alignment: .leading, spacing: 16) {
-                Text(secret.name)
-                    .font(.title2.weight(.semibold).monospaced())
-                Label(secret.isSet ? "Stored in the Keychain" : "Not set", systemImage: secret.isSet ? "checkmark.circle" : "exclamationmark.circle")
-                    .foregroundStyle(.secondary)
-                Text("Requests and environments use it as {{secret:\(secret.name)}}. Its value is never shown.")
-                    .foregroundStyle(.secondary)
-
-                HStack {
-                    Button("Set…") {
+            VStack(spacing: 0) {
+                PaneHeader(secret.name, subtitle: secret.isSet ? "Stored in the Keychain" : "Not set") {
+                    Button(secret.isSet ? "Replace Value…" : "Set Value…") {
                         store.isSettingSecret = true
                     }
                     .buttonStyle(.borderedProminent)
-
                     Button("Remove…", role: .destructive) {
                         confirmingRemoval = true
                     }
                     .disabled(!secret.isSet)
+                    .help(secret.isSet ? "Delete the value from the Keychain" : "Nothing is stored yet")
                 }
+                Divider()
+                Form {
+                    LabeledContent("Status") {
+                        Label(
+                            secret.isSet ? "Stored in the macOS Keychain" : "Not set — requests that use it fail until you set it",
+                            systemImage: secret.isSet ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"
+                        )
+                        .foregroundStyle(secret.isSet ? Color.green : Color.orange)
+                    }
+                    LabeledContent("Reference") {
+                        Text("{{secret:\(secret.name)}}")
+                            .font(.body.monospaced())
+                            .textSelection(.enabled)
+                    }
+                    LabeledContent("Used by") {
+                        Text(secret.isReferenced ? "Requests or environments in this workspace" : "Nothing in this workspace yet")
+                            .foregroundStyle(.secondary)
+                    }
+                    LabeledContent("Value") {
+                        Text("Never shown. Kestrl reads it only when it sends a request.")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .formStyle(.grouped)
+                .scrollContentBackground(.hidden)
             }
-            .padding(24)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .confirmationDialog("Remove “\(secret.name)”?", isPresented: $confirmingRemoval, titleVisibility: .visible) {
-                Button("Remove", role: .destructive) {
+                Button("Remove from Keychain", role: .destructive) {
                     Task { await store.removeSecret(secret.name) }
                 }
             } message: {
-                Text("Requests that use this secret fail until it is set again.")
+                Text(secret.isReferenced
+                     ? "Requests that use {{secret:\(secret.name)}} fail until it is set again."
+                     : "The value is deleted from the Keychain.")
             }
             .sheet(isPresented: $store.isSettingSecret) {
                 SetSecretSheet(store: store, name: secret.name)

@@ -12,21 +12,6 @@ struct EnvironmentRow: Identifiable, Equatable {
     var isSecretReference: Bool { value.contains("{{secret:") }
 }
 
-/// How the environment name sheet was opened.
-enum EnvironmentNameIntent: Identifiable, Equatable {
-    case create
-    case duplicate(source: String)
-    case rename(current: String)
-
-    var id: String {
-        switch self {
-        case .create: return "create"
-        case .duplicate(let source): return "duplicate-\(source)"
-        case .rename(let current): return "rename-\(current)"
-        }
-    }
-}
-
 /// Draft variables of the inspected environment, and the create / duplicate / rename / delete actions.
 /// Files are only written on Save, so a half-typed row never reaches disk.
 @Observable
@@ -45,7 +30,7 @@ final class EnvironmentEditor {
     private(set) var isSaving = false
 
     /// The open name sheet, if any.
-    var nameIntent: EnvironmentNameIntent?
+    var nameIntent: NameIntent?
     /// The environment waiting for delete confirmation.
     var pendingDeletion: String?
     /// A selection the user made while edits were unsaved.
@@ -154,18 +139,8 @@ final class EnvironmentEditor {
 
     // MARK: Environments
 
-    /// Validates a proposed environment name for the sheet; nil means it can be used.
-    func nameProblem(_ name: String, intent: EnvironmentNameIntent) -> String? {
-        let trimmed = name.trimmingCharacters(in: .whitespaces)
-        if trimmed.isEmpty { return "Enter a name." }
-        if let problem = validateName(kind: "environment", name: trimmed) { return problem }
-        if case .rename(let current) = intent, current == trimmed { return nil }
-        if store.workspace?.envs.contains(trimmed) == true { return "An environment named \"\(trimmed)\" already exists." }
-        return nil
-    }
-
     /// Creates, duplicates or renames, then selects the result. Returns true on success.
-    func commitName(_ name: String, intent: EnvironmentNameIntent, copyFrom: String?) async -> Bool {
+    func commitName(_ name: String, intent: NameIntent, copyFrom: String?) async -> Bool {
         guard let root = store.workspace?.root else { return false }
         let target = name.trimmingCharacters(in: .whitespaces)
         do {

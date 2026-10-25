@@ -45,29 +45,34 @@ pub fn run(ctx: &Context, args: SecretArgs) -> anyhow::Result<()> {
         SecretAction::Rm { name } => secrets::delete(&name)?,
         SecretAction::Ls => {
             let root = workspace::find_root(&std::env::current_dir()?)?;
-            let found = secrets::referenced_in_workspace(&root)?;
+            let referenced = secrets::referenced_in_workspace(&root)?;
+            let stored = secrets::stored_names()?;
+            let names: std::collections::BTreeSet<&String> = referenced.union(&stored).collect();
             if ctx.is_json {
-                let values = found
+                let values = names
                     .iter()
                     .map(|name| {
-                        Ok(serde_json::json!({
+                        serde_json::json!({
                             "name": name,
-                            "is_set": secrets::is_set(name)?,
-                        }))
+                            "is_set": stored.contains(*name),
+                            "is_referenced": referenced.contains(*name),
+                        })
                     })
-                    .collect::<anyhow::Result<Vec<_>>>()?;
+                    .collect();
                 crate::commands::output::print_json(&serde_json::Value::Array(values))?;
             } else {
-                for name in found {
-                    writeln!(
-                        std::io::stdout(),
-                        "{name}\t{}",
-                        if secrets::is_set(&name)? {
-                            "set"
-                        } else {
-                            "missing"
-                        }
-                    )?;
+                for name in names {
+                    let status = if stored.contains(name) {
+                        "set"
+                    } else {
+                        "missing"
+                    };
+                    let usage = if referenced.contains(name) {
+                        ""
+                    } else {
+                        "\tunused"
+                    };
+                    writeln!(std::io::stdout(), "{name}\t{status}{usage}")?;
                 }
             }
         }
