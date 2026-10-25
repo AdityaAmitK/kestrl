@@ -61,7 +61,7 @@ struct RequestPane: View {
         VStack(alignment: .leading, spacing: 0) {
             Text(hint).font(.system(size: 11)).foregroundStyle(.secondary)
                 .padding(.horizontal, 12).padding(.vertical, 6)
-            TextEditor(text: value).font(.system(size: 12, design: .monospaced))
+            VariableTextView(text: value, variables: store.editorVariables, label: label, environmentName: store.selectedEnvironment)
                 .padding(.horizontal, 8).accessibilityLabel(label)
         }
         .background(Color(nsColor: .textBackgroundColor))

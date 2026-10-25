@@ -47,3 +47,59 @@ impl Environment {
             .collect()
     }
 }
+
+/// One editor completion. Secret values never enter this record.
+#[derive(Debug)]
+pub struct VariableInfo {
+    pub name: String,
+    pub source: String,
+    pub value: String,
+    pub is_secret: bool,
+    pub is_set: bool,
+}
+
+/// Effective environment/workspace variables and referenced Keychain names.
+/// Preview expansion masks secrets before reading them; unresolved values remain templates.
+pub fn variable_catalog(root: &Path, env: Option<&str>) -> Result<Vec<VariableInfo>> {
+    let (_, mut vars) = workspace::load_variables(root, env)?;
+    let mut effective = vars.workspace.clone();
+    effective.extend(vars.environment.clone());
+    let statuses = crate::secrets::referenced_in_workspace(root)?
+        .into_iter()
+        .map(|name| Ok((name.clone(), crate::secrets::is_set(&name)?)))
+        .collect::<Result<BTreeMap<_, _>>>()?;
+    let mut catalog = Vec::new();
+    for (name, raw) in effective {
+        let template = vars.preview_template(&raw).unwrap_or(raw);
+        let secret_names = crate::secrets::referenced_names(&template);
+        let mut redactor = crate::secrets::Redactor::default();
+        for secret in &secret_names {
+            redactor.track(secret, &format!("{{{{secret:{secret}}}}}"));
+        }
+        let value = redactor.redact(&template);
+        catalog.push(VariableInfo {
+            source: if vars.environment.contains_key(&name) {
+                "environment"
+            } else {
+                "workspace"
+            }
+            .to_owned(),
+            name,
+            is_secret: !secret_names.is_empty(),
+            value,
+            is_set: secret_names
+                .iter()
+                .all(|name| statuses.get(name) == Some(&true)),
+        });
+    }
+    for (name, is_set) in statuses {
+        catalog.push(VariableInfo {
+            is_set,
+            name: format!("secret:{name}"),
+            source: "keychain".to_owned(),
+            value: crate::secrets::MASK.to_owned(),
+            is_secret: true,
+        });
+    }
+    Ok(catalog)
+}

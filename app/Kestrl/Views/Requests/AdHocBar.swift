@@ -16,12 +16,10 @@ struct AdHocBar: View {
             .labelsHidden()
             .frame(width: 88)
 
-            TextField("URL, such as http://localhost:4000/health", text: $store.adHocURL)
-                .textFieldStyle(.roundedBorder)
-                .font(.body.monospaced())
-                .onSubmit {
-                    Task { await store.sendAdHocRequest() }
-                }
+            VariableTextView(text: $store.adHocURL, variables: store.editorVariables, label: "Request URL", environmentName: store.selectedEnvironment, singleLine: true) {
+                Task { await store.sendAdHocRequest() }
+            }
+            .frame(height: 28)
 
             SendButton(store: store)
         }
