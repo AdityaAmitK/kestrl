@@ -33,18 +33,25 @@
       <p class="agent-status" id="agent-status" role="status" aria-live="polite"></p>
       <details class="agent-details">
         <summary>See what it asks</summary>
-        <pre id="agent-prompt">Set up Kestrl for me: a local backend workbench with a `kestrl` CLI and an agent skill.
+        <pre id="agent-prompt">Set up Kestrl for me: a local backend workbench with a `kestrl` CLI, an agent skill and a macOS app.
 
-1. Install the CLI with `curl -fsSL https://kestrl.adityakinjawadekar.com/install.sh | sh`
+First ask me which setup I want, then do only that:
+  a) CLI only   b) CLI + agent skill   c) Everything: CLI + agent skill + macOS app
+
+1. CLI: `curl -fsSL https://kestrl.adityakinjawadekar.com/install.sh | sh`
    (or `brew install adityaamitk/tap/kestrl` if Homebrew is installed and I prefer it).
    Run `kestrl --version`. If `~/.local/bin` is not on PATH, ask me before adding it to my shell profile.
-2. Install the agent skill by downloading https://kestrl.adityakinjawadekar.com/skill/SKILL.md
-   into the place for this agent, and only the ones that apply:
+2. Skill (b, c): download https://kestrl.adityakinjawadekar.com/skill/SKILL.md
+   into the place for this agent, only where it applies:
    - Claude Code: ~/.claude/skills/kestrl/SKILL.md
    - Codex: ~/.codex/skills/kestrl/SKILL.md
    - Cursor: .cursor/rules/kestrl.mdc in the current project
-3. Do not create, read or print any secrets. Do not change the system proxy, install certificates or run captures.
-4. Finish with a 3-line summary: the CLI version and path, the skill file paths, and anything you skipped.</pre>
+3. App (c): with Homebrew, `brew trust adityaamitk/tap` then `brew install --cask adityaamitk/tap/kestrl`;
+   otherwise download the latest Kestrl DMG from https://github.com/AdityaAmitK/kestrl/releases/latest
+   and copy Kestrl.app to /Applications. Tell me the app is not notarized yet, so on first launch
+   I choose Open Anyway in System Settings › Privacy &amp; Security. Do not remove quarantine yourself.
+4. Do not create, read or print any secrets. Do not change the system proxy, install certificates or run captures.
+5. Finish with a short summary: what was installed, versions and paths, and anything you skipped.</pre>
       </details>
     </div>
     <p class="alt">Or <code>brew install adityaamitk/tap/kestrl</code> · <a href="https://github.com/AdityaAmitK/kestrl/releases/latest">macOS app</a></p>
