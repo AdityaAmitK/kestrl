@@ -5,10 +5,13 @@ All notable changes are documented here. The format follows [Keep a Changelog](h
 ## [Unreleased]
 
 ### Fixed
+- macOS app: the list column of each section starts at 280 pt (220–420 pt) instead of about 45% of the window; the sidebar is 180–240 pt. Log lines stay on one row, with horizontal scrolling, unless View ▸ Wrap log lines (⌥⌘W) is on.
+- macOS app: auto-follow keeps log timestamps visible and only pauses on user scrolling; Clear resumes following new output.
 - Browser capture removes abandoned `kestrl-browser-*` temporary profiles when no browser process is using them; device and browser capture lines display full URLs without default HTTP(S) ports.
 
 ### Added
 - macOS app: Logs section streams a running service's log with a local-time gutter, stderr marking, pause-on-scroll, regex filter, and Copy and Clear.
+- macOS app: a JSON log line with `level` and `message` shows a level chip, the message, then its other keys as `key=value`. The raw line shows on hover and is what Copy copies.
 - macOS app: Database section lists connections and their tables, runs SQL with ⌘↩, shows results as a table with Copy JSON, and previews a table's columns.
 - `kestrl capture browser`: launch an isolated Chromium-family browser and capture HTTP exchanges through Chrome DevTools Protocol, with optional host filters and history recording.
 - Browser capture detects browser bundle executables from Info.plist in `/Applications` and `~/Applications`, supports Helium, and accepts `--browser-path` for other Chromium-family browsers.

@@ -12,6 +12,6 @@ struct SidebarView: View {
             }
         }
         .listStyle(.sidebar)
-        .navigationSplitViewColumnWidth(min: 170, ideal: 190, max: 240)
+        .navigationSplitViewColumnWidth(min: 180, ideal: 200, max: 240)
     }
 }

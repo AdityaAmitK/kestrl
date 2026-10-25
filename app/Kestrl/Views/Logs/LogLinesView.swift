@@ -4,13 +4,18 @@ import SwiftUI
 /// The lines of the selected service in a lazy stack, so a long log stays smooth. Follows the newest line until the user scrolls up.
 struct LogLinesView: View {
     @Bindable var store: WorkspaceStore
+    @State private var isUserScrolling = false
 
     var body: some View {
         ScrollViewReader { proxy in
-            ScrollView {
+            ScrollView(store.wrapLogLines ? .vertical : [.vertical, .horizontal]) {
                 LazyVStack(alignment: .leading, spacing: 0) {
                     ForEach(store.logLines, id: \.seq) { line in
-                        LogLineRow(line: line, isSelected: store.selectedLogSeqs.contains(line.seq))
+                        LogLineRow(
+                            line: line,
+                            isSelected: store.selectedLogSeqs.contains(line.seq),
+                            wrapsLines: store.wrapLogLines
+                        )
                             .id(line.seq)
                             .contentShape(Rectangle())
                             .onTapGesture {
@@ -25,7 +30,7 @@ struct LogLinesView: View {
                 if !store.logsFollowing, let last = store.logLines.last {
                     Button {
                         store.logsFollowing = true
-                        proxy.scrollTo(last.seq, anchor: .bottom)
+                        proxy.scrollTo(last.seq, anchor: .bottomLeading)
                     } label: {
                         Label("Jump to latest", systemImage: "arrow.down.to.line")
                     }
@@ -36,11 +41,14 @@ struct LogLinesView: View {
             }
             .onChange(of: store.logLines.last?.seq) { _, last in
                 guard store.logsFollowing, let last else { return }
-                proxy.scrollTo(last, anchor: .bottom)
+                proxy.scrollTo(last, anchor: .bottomLeading)
             }
-            // Moving up means the user scrolled. New lines grow the content but leave the offset alone, so they never pause the view.
+            .onScrollPhaseChange { _, phase in
+                isUserScrolling = phase == .interacting || phase == .decelerating
+            }
+            // Only a user scroll pauses following; wrapping and clearing also change the offset.
             .onScrollGeometryChange(for: CGFloat.self, of: { $0.contentOffset.y }) { old, new in
-                if new < old - 1 {
+                if isUserScrolling, new < old - 1 {
                     store.logsFollowing = false
                 }
             }

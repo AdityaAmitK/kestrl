@@ -37,6 +37,11 @@ struct KestrlCommands: Commands {
         }
 
         CommandGroup(after: .sidebar) {
+            Toggle("Wrap log lines", isOn: $store.wrapLogLines)
+                .keyboardShortcut("w", modifiers: [.command, .option])
+
+            Divider()
+
             Button("Refresh") {
                 Task { await store.reload() }
             }
