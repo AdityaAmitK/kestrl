@@ -28,12 +28,97 @@
       <code>curl -fsSL https://kestrl.adityakinjawadekar.com/install.sh | sh</code>
       <button class="copy-button" type="button" data-copy>Copy</button>
     </div>
+    <div class="agent">
+      <button class="ghost-button" type="button" data-copy-agent="agent-prompt">Copy to my agent</button>
+      <p class="agent-status" id="agent-status" role="status" aria-live="polite"></p>
+      <details class="agent-details">
+        <summary>See what it asks</summary>
+        <pre id="agent-prompt">Set up Kestrl for me: a local backend workbench with a `kestrl` CLI and an agent skill.
+
+1. Install the CLI with `curl -fsSL https://kestrl.adityakinjawadekar.com/install.sh | sh`
+   (or `brew install adityaamitk/tap/kestrl` if Homebrew is installed and I prefer it).
+   Run `kestrl --version`. If `~/.local/bin` is not on PATH, ask me before adding it to my shell profile.
+2. Install the agent skill by downloading https://kestrl.adityakinjawadekar.com/skill/SKILL.md
+   into the place for this agent, and only the ones that apply:
+   - Claude Code: ~/.claude/skills/kestrl/SKILL.md
+   - Codex: ~/.codex/skills/kestrl/SKILL.md
+   - Cursor: .cursor/rules/kestrl.mdc in the current project
+3. Do not create, read or print any secrets. Do not change the system proxy, install certificates or run captures.
+4. Finish with a 3-line summary: the CLI version and path, the skill file paths, and anything you skipped.</pre>
+      </details>
+    </div>
     <p class="alt">Or <code>brew install adityaamitk/tap/kestrl</code> · <a href="https://github.com/AdityaAmitK/kestrl/releases/latest">macOS app</a></p>
     <nav class="quiet-links" aria-label="More">
       <a href="docs/index.html">Docs</a>
       <a href="https://github.com/AdityaAmitK/kestrl">GitHub</a>
     </nav>
   </main>
+
+  <section class="more" aria-labelledby="more-title">
+    <h2 id="more-title" class="visually-hidden">What Kestrl does</h2>
+    <div class="points">
+      <article>
+        <h3>One tool instead of four</h3>
+        <p>Kestrl replaces the API client, the log tabs, the database GUI and the traffic inspector with one tool. Send requests, read service logs, query Postgres and inspect traffic from the CLI or macOS app.</p>
+      </article>
+      <article>
+        <h3>Built for agents</h3>
+        <p>Agents call <code>kestrl</code> instead of <code>curl</code>. Every request records who ran it: me, Claude Code, Codex or Cursor. Secrets are injected from the Keychain and masked in output, so their values never reach the agent.</p>
+      </article>
+      <article>
+        <h3>Local and private</h3>
+        <p>No accounts, no cloud sync, no telemetry. History is a local SQLite file, secrets live in the macOS Keychain, and request files are plain TOML you can commit.</p>
+      </article>
+      <article>
+        <h3>Capture what an app sends</h3>
+        <p>Capture traffic from the iOS Simulator, the Android emulator, a browser Kestrl opens, or a plain-HTTP port on localhost. Port capture needs a one-time administrator setup.</p>
+      </article>
+    </div>
+
+    <section class="shots" aria-labelledby="shots-title">
+      <h2 id="shots-title">The app and the CLI, on one history</h2>
+      <figure class="shot">
+        <picture>
+          <source type="image/webp" srcset="assets/app-history.webp">
+          <img src="assets/app-history.png" width="1200" height="760" loading="lazy" alt="Kestrl’s macOS History screen showing dummy testbed requests by me, Codex, Cursor and Claude Code, including a login-bug tag.">
+        </picture>
+        <figcaption>The macOS app: requests to a local demo API, with actors and tags.</figcaption>
+      </figure>
+      <figure class="terminal-figure">
+        <pre class="terminal"><code><span class="prompt">$</span> kestrl send requests/admin/stats.req.toml --json
+{
+  &quot;body&quot;: {
+    &quot;memory_mb&quot;: 21,
+    &quot;users&quot;: 0
+  },
+  &quot;error&quot;: null,
+  &quot;headers&quot;: {
+    &quot;connection&quot;: &quot;keep-alive&quot;,
+    &quot;content-type&quot;: &quot;application/json&quot;,
+    &quot;date&quot;: &quot;Sun, 25 Oct 2026 06:12:13 GMT&quot;,
+    &quot;keep-alive&quot;: &quot;timeout=5&quot;,
+    &quot;transfer-encoding&quot;: &quot;chunked&quot;,
+    &quot;x-request-id&quot;: &quot;c744529a&quot;
+  },
+  &quot;id&quot;: &quot;01M5RV0BGGHDCJZAYM1PQFFXCB&quot;,
+  &quot;ms&quot;: 2,
+  &quot;redacted&quot;: [
+    &quot;testbed_admin_token&quot;
+  ],
+  &quot;status&quot;: 200
+}
+
+<span class="prompt">$</span> kestrl history --limit 5
+01M5RV0BGGHDCJZAYM1PQFFXCB    0s  me            GET /admin/stats 200 2ms
+01M5RTYKFHSHR46BGVXAMGHR7C   57s  codex         GET /slow 200 425ms
+01M5RTYK1ZQ219393FFFBFC4X7   57s  me            GET /health 200 1ms
+01M5RTYK1NBZDPYN879AWJZV3J   57s  cursor        GET /random 200 1ms
+01M5RTYK1C9B8XW6NHSGQ1GKW3   57s  me            GET /error 500 1ms  #login-bug</code></pre>
+        <figcaption>The CLI: a real demo response with redaction, followed by the same request history.</figcaption>
+      </figure>
+    </section>
+  </section>
+
   <footer class="site-footer"><p>MIT OR Apache-2.0</p></footer>
 </body>
 </html>

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Deploy site/ to kestrl.adityakinjawadekar.com.
+# Deploy site/ to kestrl.adityakinjawadekar.com. The agent skill is copied from skills/kestrl/.
 # Stylesheet and script links get a content-hash query (style.css?v=abc123), so browsers
 # and Cloudflare never pair new pages with an old cached stylesheet.
 # Usage: scripts/deploy-site.sh   (needs SSH access; KESTRL_DEPLOY_KEY overrides the key path)
@@ -14,6 +14,9 @@ BUILD="$(mktemp -d "${TMPDIR:-/tmp}/kestrl-site.XXXXXX")"
 trap 'rm -r "$BUILD"' EXIT
 
 rsync -a --exclude README.md "$ROOT/site/" "$BUILD/"
+# The agent skill is served from /skill/SKILL.md (text/plain) for the "Copy to my agent" prompt.
+mkdir "$BUILD/skill"
+cp "$ROOT/skills/kestrl/SKILL.md" "$BUILD/skill/SKILL.md"
 
 css_version="$(shasum -a 256 "$BUILD/style.css" | cut -c1-10)"
 js_version="$(shasum -a 256 "$BUILD/script.js" | cut -c1-10)"
