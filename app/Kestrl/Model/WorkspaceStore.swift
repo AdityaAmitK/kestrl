@@ -151,6 +151,17 @@ final class WorkspaceStore {
 
     // MARK: Workspace
 
+    func chooseWorkspace() async {
+        let panel = NSOpenPanel()
+        panel.title = "Open workspace"
+        panel.prompt = "Open workspace"
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        guard await panel.begin() == .OK, let url = panel.url else { return }
+        await loadWorkspace(from: url)
+    }
+
     func restoreLastWorkspace() async {
         guard workspace == nil, let path = defaults.string(forKey: Self.lastWorkspaceKey) else { return }
         await loadWorkspace(from: URL(fileURLWithPath: path))
