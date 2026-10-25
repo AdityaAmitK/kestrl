@@ -1434,6 +1434,7 @@ dependencies = [
  "kestrl-core",
  "serde_json",
  "thiserror 2.0.21",
+ "toml 0.8.23",
  "uniffi",
 ]
 

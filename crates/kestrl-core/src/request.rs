@@ -3,14 +3,14 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::profile;
 use crate::vars::Variables;
 use crate::workspace::WorkspaceConfig;
 use crate::{Error, Result};
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct RequestFile {
     pub name: Option<String>,
     pub method: String,
@@ -24,7 +24,7 @@ pub struct RequestFile {
     pub body: Option<Body>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum Body {
     Json { content: String },

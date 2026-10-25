@@ -14,6 +14,11 @@ use crate::{Error, Result};
 
 /// What to send.
 pub enum Target {
+    /// An unsaved request from the app, resolved and redacted like a file.
+    Draft {
+        request: request::RequestFile,
+        request_path: Option<PathBuf>,
+    },
     /// Request file, absolute or relative to the working directory
     File(PathBuf),
     AdHoc {
@@ -60,6 +65,16 @@ pub fn send(root: &Path, target: Target, options: &SendOptions, client: &Client)
         redactor: Redactor::default(),
     };
     let (request_ref, request_file) = match target {
+        Target::Draft {
+            request,
+            request_path,
+        } => (
+            request_path
+                .as_deref()
+                .map(|path| request_ref(root, path))
+                .transpose()?,
+            request,
+        ),
         Target::File(path) => (Some(request_ref(root, &path)?), request::load(&path)?),
         Target::AdHoc { method, url } => (None, request::ad_hoc(&method, &url)),
     };

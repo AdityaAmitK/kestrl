@@ -15,13 +15,10 @@ struct ContentView: View {
         }
         .frame(minWidth: 960, minHeight: 600)
         .preferredColorScheme(store.appearance.colorScheme)
-        .fileImporter(isPresented: $store.isShowingOpenPanel, allowedContentTypes: [.folder]) { result in
-            switch result {
-            case .success(let url):
-                Task { await store.loadWorkspace(from: url) }
-            case .failure(let error):
-                store.report(error)
-            }
+        .onChange(of: store.isShowingOpenPanel) { _, isShowing in
+            guard isShowing else { return }
+            store.isShowingOpenPanel = false
+            Task { await store.chooseWorkspace() }
         }
         .sheet(isPresented: $store.isShowingComparison) {
             CompareView(store: store)
