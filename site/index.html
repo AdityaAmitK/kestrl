@@ -42,12 +42,12 @@
   "headers": { "content-type": "application/json" },
   "body": { "ok": true },
   "redacted": ["local_token"],
-  "actor": "me"
+  "error": null
 }
 
 <span class="comment"># Find the event in shared history</span>
 <span class="command">$ kestrl history --since 1h</span>
-        <span class="ok">200  GET  /health  84ms  actor: me</span></pre>
+        <span class="ok">01J8Q6M2W7R4   4s  me    GET /health 200 84ms</span></pre>
         <p class="terminal-caption">The token used by this request was masked in output and stored history.</p>
       </div>
     </section>
@@ -84,11 +84,12 @@
           <header><span>history event</span><span id="actor-label">actor: <span id="actor-name-visible">me</span></span></header>
           <pre id="actor-output" aria-live="polite">{
   "id": "01J8Q6M2W7R4",
-  "status": 200,
-  "ms": 84,
-  "body": { "ok": true },
-  "redacted": ["local_token"],
-  "actor": "me"
+  "kind": "http",
+  "source": "cli",
+  "actor": "me",
+  "env": "local",
+  "summary": "GET /health 200 84ms",
+  "tags": []
 }</pre>
         </div>
       </div>

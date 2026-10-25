@@ -25,11 +25,12 @@ document.addEventListener('click', async (event) => {
     if (output) {
       output.textContent = JSON.stringify({
         id: '01J8Q6M2W7R4',
-        status: 200,
-        ms: 84,
-        body: { ok: true },
-        redacted: ['local_token'],
-        actor
+        kind: 'http',
+        source: 'cli',
+        actor,
+        env: 'local',
+        summary: 'GET /health 200 84ms',
+        tags: []
       }, null, 2);
     }
   }
