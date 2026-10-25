@@ -79,7 +79,7 @@ app/              SwiftUI macOS app; links kestrl-ffi as an XCFramework
 
 | Area | Functions |
 |---|---|
-| Workspace | `open_workspace(path) -> WorkspaceInfo` (root, default env, envs, profiles, requests with method and name, retention settings) |
+| Workspace | `create_workspace(path) -> WorkspaceInfo` (initialize then open), `open_workspace(path) -> WorkspaceInfo` (root, default env, envs, profiles, requests with method and name, retention settings) |
 | Requests | `send_request_file(root, path, env, profiles, vars)`, `send_ad_hoc(root, method, url, env)` → `SentExchange`; recorded as actor `me`, source `app` |
 | Requests | `send_request_draft(root, draft, env)`, `save_request_draft(root, path, draft)` — unresolved drafts use the shared send path; explicit atomic saves reject external changes |
 | Requests | `read_request_file(root, path)` → `RequestDetail`, the file as written, variables unresolved |
@@ -179,6 +179,9 @@ The source of truth is `crates/kestrl-core/migrations/`.
 ## CLI surface
 
 ```
+# Workspace
+kestrl init [DIR]                        # current directory by default; never overwrite
+
 # Requests
 kestrl send <file|METHOD URL> [-e env] [-p profile]... [--var k=v]... [--tag t] [--json]
 kestrl run <dir> [-e env] [-p profile]...

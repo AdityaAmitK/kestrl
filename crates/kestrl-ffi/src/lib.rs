@@ -38,4 +38,6 @@ pub use services::{
     LogFollow, LogLine, LogSink, ServiceInfo, follow_logs, list_services, read_logs,
 };
 pub use types::KeyValue;
-pub use workspace::{RequestEntry, WorkspaceInfo, WorkspaceSettings, open_workspace};
+pub use workspace::{
+    RequestEntry, WorkspaceInfo, WorkspaceSettings, create_workspace, open_workspace,
+};

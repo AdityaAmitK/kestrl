@@ -39,8 +39,8 @@ cargo install --path crates/kestrl-cli
 ## Quick start
 
 ```sh
-kestrl secret set local_token          # stored in the Keychain
-kestrl send requests/auth/login.req.toml -e local
+kestrl init                           # create a workspace in your project folder
+kestrl send requests/health.req.toml    # start your API on localhost:3000 first
 kestrl history --since 1h
 ```
 

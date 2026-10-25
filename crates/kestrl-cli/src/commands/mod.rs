@@ -4,6 +4,7 @@ pub mod capture;
 pub mod db;
 pub mod envs;
 pub mod history;
+pub mod init;
 pub mod logs;
 pub mod output;
 pub mod profiles;
@@ -23,6 +24,8 @@ use crate::context::Context;
 
 #[derive(Debug, Subcommand)]
 pub enum Command {
+    /// Create a starter workspace without overwriting existing files
+    Init(init::InitArgs),
     /// Send one request (file or METHOD URL)
     Send(send::SendArgs),
     /// Send every request in a collection, in order
@@ -69,6 +72,7 @@ pub struct ResolveArgs {
 
 pub fn dispatch(ctx: &Context, command: Command) -> anyhow::Result<()> {
     match command {
+        Command::Init(args) => init::run(ctx, args),
         Command::Send(args) => send::run(ctx, args),
         Command::Run(args) => run::run(ctx, args),
         Command::Envs(args) => envs::run(ctx, args),

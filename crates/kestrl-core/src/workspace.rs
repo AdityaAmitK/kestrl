@@ -1,6 +1,7 @@
 //! Workspace discovery and `.kestrl/kestrl.toml` configuration.
 
 use std::collections::BTreeMap;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
@@ -18,6 +19,86 @@ pub struct WorkspaceConfig {
     pub vars: BTreeMap<String, String>,
     #[serde(default)]
     pub retention: RetentionOptions,
+}
+
+/// Files created by workspace initialization, relative to the workspace root.
+#[derive(Debug, serde::Serialize)]
+pub struct InitReport {
+    /// Starter configuration, environment and request files.
+    pub created_paths: Vec<PathBuf>,
+}
+
+/// Create a starter workspace without overwriting any existing path.
+pub fn init(root: &Path) -> Result<InitReport> {
+    let config_dir = root.join(".kestrl");
+    if config_dir.symlink_metadata().is_ok() {
+        return Err(Error::WorkspaceExists { path: config_dir });
+    }
+    let files = [
+        (
+            ".kestrl/kestrl.toml",
+            "# Default environment for requests.\ndefault_env = \"local\"\n",
+        ),
+        (
+            ".kestrl/envs/local.toml",
+            "[vars]\napi_url = \"http://localhost:3000\"\n# token = \"{{secret:local_token}}\"\n",
+        ),
+        (
+            "requests/health.req.toml",
+            "name = \"Health\"\nmethod = \"GET\"\nurl = \"{{api_url}}/health\"\n",
+        ),
+    ];
+    // Reject an existing starter request before creating workspace configuration.
+    for (relative, _) in &files {
+        let path = root.join(relative);
+        if path.symlink_metadata().is_ok() {
+            return Err(Error::Write {
+                path,
+                source: std::io::Error::new(
+                    std::io::ErrorKind::AlreadyExists,
+                    "starter file already exists",
+                ),
+            });
+        }
+    }
+    std::fs::create_dir_all(root).map_err(|source| Error::Write {
+        path: root.to_owned(),
+        source,
+    })?;
+    std::fs::create_dir(&config_dir).map_err(|source| {
+        if source.kind() == std::io::ErrorKind::AlreadyExists {
+            Error::WorkspaceExists {
+                path: config_dir.clone(),
+            }
+        } else {
+            Error::Write {
+                path: config_dir.clone(),
+                source,
+            }
+        }
+    })?;
+    let mut created_paths = Vec::new();
+    for (relative, contents) in files {
+        let path = root.join(relative);
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).map_err(|source| Error::Write {
+                path: parent.to_owned(),
+                source,
+            })?;
+        }
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&path)
+            .map_err(|source| Error::Write {
+                path: path.clone(),
+                source,
+            })?;
+        file.write_all(contents.as_bytes())
+            .map_err(|source| Error::Write { path, source })?;
+        created_paths.push(PathBuf::from(relative));
+    }
+    Ok(InitReport { created_paths })
 }
 
 /// The workspace containing the current directory.
