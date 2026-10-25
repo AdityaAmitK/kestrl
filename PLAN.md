@@ -233,3 +233,7 @@ The global `--json` option applies to database commands as well.
 6. **Types (later):** schema inference from history, OpenAPI and JSON Schema import, validation, drift detection, type export.
 
 **Later:** Postman collection import, physical-device capture over Wi-Fi.
+
+## Website
+
+The static site keeps an icon-led installation hero with an inspectable “Copy to my agent” setup prompt, short feature descriptions, and demo GUI and CLI views. Deployment serves the canonical `skills/kestrl/SKILL.md` at `/skill/SKILL.md`.

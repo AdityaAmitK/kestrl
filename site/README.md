@@ -12,4 +12,6 @@ Open <http://localhost:8765/>. The pages use one shared `style.css` and a small 
 
 ## Deploy
 
-`scripts/deploy-site.sh` copies `site/` to the VPS and adds a content hash to the stylesheet and script links (`style.css?v=…`), so browsers and Cloudflare never pair new pages with an old cached stylesheet. The nginx config is `packaging/nginx/kestrl.adityakinjawadekar.com.conf`.
+`scripts/deploy-site.sh` copies `site/` to the VPS and adds a content hash to the stylesheet and script links (`style.css?v=…`), so browsers and Cloudflare never pair new pages with an old cached stylesheet. It also copies `skills/kestrl/SKILL.md` to `skill/SKILL.md`, which the "Copy to my agent" prompt downloads; that file is not duplicated in `site/`. The nginx config is `packaging/nginx/kestrl.adityakinjawadekar.com.conf`.
+
+The "Copy to my agent" prompt is the `<pre id="agent-prompt">` text under "See what it asks". Edit it there; `script.js` copies it from the page.
