@@ -26,6 +26,11 @@ struct KestrlCommands: Commands {
 
             Divider()
 
+            Button("New Workspace…") {
+                store.isShowingNewPanel = true
+            }
+            .keyboardShortcut("n", modifiers: [.command, .shift])
+
             Button("Open workspace…") {
                 store.isShowingOpenPanel = true
             }

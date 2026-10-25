@@ -19,6 +19,11 @@ struct ContentView: View {
         .onChange(of: store.workspace?.root) { _, _ in
             capture.stopForWorkspaceChange()
         }
+        .onChange(of: store.isShowingNewPanel) { _, isShowing in
+            guard isShowing else { return }
+            store.isShowingNewPanel = false
+            Task { await store.chooseNewWorkspace() }
+        }
         .onChange(of: store.isShowingOpenPanel) { _, isShowing in
             guard isShowing else { return }
             store.isShowingOpenPanel = false

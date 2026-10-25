@@ -39,8 +39,8 @@ cargo install --path crates/kestrl-cli
 ## Quick start
 
 ```sh
-kestrl secret set local_token          # stored in the Keychain
-kestrl send requests/auth/login.req.toml -e local
+kestrl init                           # create a workspace in your project folder
+kestrl send requests/health.req.toml    # start your API on localhost:3000 first
 kestrl history --since 1h
 ```
 
@@ -61,6 +61,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Security issues: see [SECURITY.md](SECUR
 
 ## License
 
-Licensed under either of [Apache License 2.0](LICENSE-APACHE) or [MIT](LICENSE-MIT), at your option.
-
-Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in this work, as defined in the Apache-2.0 license, shall be dual licensed as above, without any additional terms or conditions.
+Licensed under the [MIT License](LICENSE).

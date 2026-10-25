@@ -11,6 +11,7 @@ Check it is available with `kestrl --version`. A workspace is any folder at or a
 
 ## Rules
 
+- Run `kestrl init [DIR]` only when the user asks to set up a workspace. It creates starter configuration and a health request; never initialize a workspace implicitly.
 - **Prefer `kestrl send` over `curl`** for any request to the project's API, so it is recorded and secrets stay masked.
 - **Never handle raw secrets.** Reference them as `{{secret:name}}`. If one is missing, tell the user to run `kestrl secret set <name>` themselves. Never run `secret set` with a value you invented or saw in output, and never try to read the Keychain directly.
 - **Output is JSON when piped**, so parse it (`| jq`) instead of scraping text. `redacted` lists which secrets were masked; `••••••` in output is a masked secret, not a bug.

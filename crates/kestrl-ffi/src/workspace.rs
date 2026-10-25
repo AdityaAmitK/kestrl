@@ -70,3 +70,10 @@ pub fn open_workspace(path: String) -> Result<WorkspaceInfo, KestrlError> {
         },
     })
 }
+
+/// Create a starter workspace at exactly `path`, then open it.
+#[uniffi::export]
+pub fn create_workspace(path: String) -> Result<WorkspaceInfo, KestrlError> {
+    workspace::init(Path::new(&path))?;
+    open_workspace(path)
+}
