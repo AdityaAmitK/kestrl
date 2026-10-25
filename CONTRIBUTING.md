@@ -23,4 +23,4 @@ Thanks for your interest. Read [PLAN.md](PLAN.md) for the design and glossary, a
 
 ## License
 
-By contributing, you agree that your contributions are dual licensed under MIT and Apache-2.0, as described in the [README](README.md#license).
+By contributing, you agree that your contributions are licensed under the [MIT License](LICENSE).
