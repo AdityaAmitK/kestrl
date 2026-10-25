@@ -1,0 +1,83 @@
+---
+name: kestrl
+description: Use the `kestrl` CLI instead of curl, ad-hoc psql, or scrolling terminal output when working on a backend that has a Kestrl workspace (a `.kestrl/` folder) or when the user mentions Kestrl. Covers sending API requests with environments and Keychain secrets, reading request history, reading service logs, querying Postgres read-only, and capturing traffic. Triggers on "send a request", "hit the endpoint", "check the logs", "what did the server return", "query the db", "replay that request", "capture traffic", or any API debugging in a repo containing `.kestrl/`.
+---
+
+# Kestrl
+
+Kestrl is a local backend workbench with a CLI and a macOS app over the same data. Use it instead of `curl`, raw `psql`, and copy-pasted terminal logs: every request and query you run is recorded in shared history (attributed to you as the actor), secrets are injected from the macOS Keychain and masked in all output, and the user sees your work in the app.
+
+Check it is available with `kestrl --version`. A workspace is any folder at or above the current directory containing `.kestrl/`.
+
+## Rules
+
+- **Prefer `kestrl send` over `curl`** for any request to the project's API, so it is recorded and secrets stay masked.
+- **Never handle raw secrets.** Reference them as `{{secret:name}}`. If one is missing, tell the user to run `kestrl secret set <name>` themselves. Never run `secret set` with a value you invented or saw in output, and never try to read the Keychain directly.
+- **Output is JSON when piped**, so parse it (`| jq`) instead of scraping text. `redacted` lists which secrets were masked; `••••••` in output is a masked secret, not a bug.
+- **Your actor is detected automatically** (Claude Code, Codex, Cursor). Set `--actor <name>` only if detection is wrong.
+- **Database is read-only by default.** If a write fails with "is read-only in env", report it; do not edit `allow_writes` unless the user asks.
+- **Ask before capture.** `capture sim` changes the macOS system proxy and `capture browser` opens a window; only run them when the user asks. If a capture is interrupted, `kestrl proxy restore` puts the proxy back.
+- Do not start or stop the user's services with `kestrl up` unless asked; read logs from services already running.
+
+## Requests
+
+```sh
+kestrl envs                                   # environments in this workspace
+kestrl envs local                             # resolved variables (secrets masked)
+kestrl send requests/auth/login.req.toml -e local
+kestrl send GET '{{api_url}}/users' -e local  # ad hoc, variables still resolve
+kestrl send requests/admin/stats.req.toml -p admin --var user_id=42
+kestrl send requests/users/list.req.toml --tag login-bug
+kestrl run requests/users -e local            # every request in a folder, in order
+```
+
+`send` JSON: `{ id, status, ms, headers, body, redacted, error }`. `id` is the history event id.
+
+Request files are plain TOML (`*.req.toml`): `method`, `url`, optional `profiles`, `[headers]`, `[query]`, `[body] type = "json"|"text"|"form"`. Environments are `.kestrl/envs/<env>.toml` with `[vars]`. Profiles (`.kestrl/profiles/<name>.toml`) add headers or query params, explicitly with `-p` or automatically via a `[when]` block. Precedence: `--var` > environment > workspace; profiles override the request file's own headers and query.
+
+## History
+
+```sh
+kestrl history --since 30m                    # newest first, default 20
+kestrl history "users 500" --by me            # full-text search, filter by actor
+kestrl history --tag login-bug
+kestrl history show <id>                      # full request and response (ids accept unique prefixes)
+kestrl history replay <id>                    # send it again, recorded as a new event
+kestrl history diff <id-a> <id-b>             # status, timing, headers, JSON body paths
+kestrl tag <id> login-bug
+kestrl history edit <id> --note "fails without X-Tenant"
+kestrl session start "fix login" / kestrl session end
+```
+
+Use history to see what the user (actor `me`) already tried before you start, and `diff` to compare a working and a failing call.
+
+## Logs
+
+```sh
+kestrl ps                                     # services started with `kestrl up`, with ports
+kestrl logs api --since 2m --grep 'error|panic'
+kestrl logs api --limit 50
+```
+
+Logs are kept in memory only while the service runs. If `ps` shows nothing, the user's server was not started through Kestrl; ask them to restart it with `kestrl up <name> -- <their command>`, or read a log file with `kestrl logs attach <name> --file <path>`.
+
+## Database
+
+```sh
+kestrl db connections
+kestrl db tables main -e local                # or: kestrl db tables main users
+kestrl db query main "select id, email from users order by id desc limit 5" -e local
+```
+
+JSON: `{ columns, rows, row_count, ms }`. Queries are recorded in history.
+
+## Capture (only when asked)
+
+```sh
+kestrl capture browser --url http://localhost:3000   # separate browser, isolated profile
+kestrl capture sim --host api.example.com            # iOS Simulator via system proxy
+kestrl capture port 4000                             # plain HTTP on a loopback port (needs one-time setup)
+kestrl proxy restore                                 # if a capture was killed
+```
+
+Captures stream to stdout and are not stored unless `--save` is given.

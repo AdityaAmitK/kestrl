@@ -15,6 +15,7 @@ All notable changes are documented here. The format follows [Keep a Changelog](h
 - Browser capture removes abandoned `kestrl-browser-*` temporary profiles when no browser process is using them; device and browser capture lines display full URLs without default HTTP(S) ports.
 
 ### Added
+- Agent skill (`skills/kestrl/SKILL.md`) for Claude Code, Codex and other agents.
 - macOS app: a custom kestrel app icon for the Dock, Finder and app switcher.
 - macOS request editor: editable method, URL, headers, query params, JSON/text/form bodies and profiles; send without saving, explicit Save/Save As, in-memory drafts, external-edit protection and confirmation before quitting with unsaved edits.
 - macOS workbench: compact pane headers and empty states, searchable request collection, persistent top request bar, syntax-colored response bodies, and on-demand table columns.
