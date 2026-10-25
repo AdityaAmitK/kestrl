@@ -26,6 +26,15 @@ kestrl history --since 1h
 
 Request files, environments and profiles are plain TOML under `.kestrl/` and `requests/`, so they can be committed and shared with git. See [PLAN.md](PLAN.md#project-layout).
 
+## Agent skill
+
+`skills/kestrl/SKILL.md` teaches Claude Code, Codex and other agents to use `kestrl` instead of `curl`. Install it with:
+
+```sh
+mkdir -p ~/.claude/skills/kestrl && cp skills/kestrl/SKILL.md ~/.claude/skills/kestrl/
+mkdir -p ~/.codex/skills/kestrl  && cp skills/kestrl/SKILL.md ~/.codex/skills/kestrl/
+```
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). Security issues: see [SECURITY.md](SECURITY.md).
