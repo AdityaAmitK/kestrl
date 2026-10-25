@@ -5,6 +5,7 @@ All notable changes are documented here. The format follows [Keep a Changelog](h
 ## [Unreleased]
 
 ### Fixed
+- Capture host filters include subdomains for plain domains, correctly anchor wildcard suffixes, and omit excluded HTTPS tunnels from the capture list and history. The app clarifies when filters apply.
 - Device capture takes an exclusive, cross-process lock before it touches any device proxy setting. A second `kestrl capture` or app capture fails with a clear error instead of restoring the first capture's proxy.
 - `kestrl capture android` targets exactly one booted emulator, pins every `adb` call to it, and fails when none or several are running. Physical devices are no longer accepted.
 - `kestrl capture android` saves the emulator's previous global `http_proxy` before changing it and restores that value on stop, instead of overwriting it with `:0`. A saved record survives a crash and is restored on the next device capture start; if the emulator is not running, the start fails and keeps the record.

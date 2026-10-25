@@ -39,7 +39,7 @@ struct PortOptions {
     /// Save each captured exchange to history
     #[arg(long)]
     save: bool,
-    /// Limit captured hosts
+    /// Limit capture to domains (including subdomains) or * patterns
     #[arg(long)]
     host: Vec<String>,
     #[command(subcommand)]
@@ -70,7 +70,7 @@ struct BrowserOptions {
     /// Save each captured exchange to history
     #[arg(long)]
     save: bool,
-    /// Limit captured hosts
+    /// Limit capture to domains (including subdomains) or * patterns
     #[arg(long)]
     host: Vec<String>,
 }
@@ -83,7 +83,7 @@ struct CaptureOptions {
     /// Save each captured exchange to history
     #[arg(long)]
     save: bool,
-    /// Limit captured hosts
+    /// Limit capture to domains (including subdomains) or * patterns
     #[arg(long)]
     host: Vec<String>,
 }

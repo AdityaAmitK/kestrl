@@ -215,6 +215,8 @@ kestrl proxy ca                             # show the root certificate path and
 kestrl proxy restore                       # restore macOS and Android emulator proxy settings saved by an interrupted capture
 ```
 
+Capture host filters accept domains and `*` patterns. A plain domain includes itself and its subdomains (at a dot boundary); patterns match the whole hostname, case-insensitively. Excluded HTTPS hosts tunnel without capture or history entries. GUI filters apply when Start is pressed; an existing capture list is unchanged until a new capture starts.
+
 The global `--json` option applies to database commands as well.
 
 `send` JSON output: `{ id, status, ms, headers, body, redacted: ["local_token"] }`
