@@ -8,4 +8,4 @@ Preview it from the repository root:
 python3 -m http.server -d site 8765
 ```
 
-Open <http://localhost:8765/>. The pages use one shared `style.css` and a small `script.js` for code copy buttons and the actor example on the landing page. All documentation can be read without JavaScript.
+Open <http://localhost:8765/>. The pages use one shared `style.css` and a small `script.js` that only powers the copy buttons. Icons live in `assets/` and are extracted from `app/Kestrl/Resources/AppIcon.icns`. All documentation can be read without JavaScript.
