@@ -16,7 +16,7 @@ pub struct ProxyArgs {
 enum ProxyCommand {
     /// Install the Kestrl root certificate on a device
     Trust(TrustOptions),
-    /// Restore system proxy settings saved by an interrupted capture
+    /// Restore macOS and Android emulator proxy settings saved by an interrupted capture
     Restore,
     /// Print the root CA file path and fingerprint
     Ca,
@@ -62,10 +62,10 @@ pub fn run(args: ProxyArgs) -> anyhow::Result<()> {
             let _ = options;
         }
         ProxyCommand::Restore => {
-            capture::system_proxy::restore()?;
+            capture::session::restore_saved()?;
             writeln!(
                 std::io::stdout(),
-                "Saved macOS system proxy settings restored."
+                "Device proxy settings saved by an interrupted capture restored."
             )?;
         }
         ProxyCommand::Ca => {

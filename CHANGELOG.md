@@ -5,6 +5,9 @@ All notable changes are documented here. The format follows [Keep a Changelog](h
 ## [Unreleased]
 
 ### Fixed
+- Device capture takes an exclusive, cross-process lock before it touches any device proxy setting. A second `kestrl capture` or app capture fails with a clear error instead of restoring the first capture's proxy.
+- `kestrl capture android` targets exactly one booted emulator, pins every `adb` call to it, and fails when none or several are running. Physical devices are no longer accepted.
+- `kestrl capture android` saves the emulator's previous global `http_proxy` before changing it and restores that value on stop, instead of overwriting it with `:0`. A saved record survives a crash and is restored on the next device capture start; if the emulator is not running, the start fails and keeps the record.
 - `kestrl capture browser` stops on Ctrl-C through a per-capture stop flag instead of a process-wide interrupt, so the app can start and stop captures repeatedly. A stop also ends the wait for a response body that the browser never sends.
 - macOS app: the list column of each section starts at 240 pt (200–340 pt) instead of about 45% of the window; the sidebar is 180–240 pt. Log lines stay on one row, with horizontal scrolling, unless View ▸ Wrap log lines (⌥⌘W) is on.
 - macOS app: auto-follow keeps log timestamps visible and only pauses on user scrolling; Clear resumes following new output.

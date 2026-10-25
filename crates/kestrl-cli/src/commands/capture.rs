@@ -24,7 +24,7 @@ pub struct CaptureArgs {
 enum DeviceCommand {
     /// Capture traffic from a booted iOS Simulator
     Sim(CaptureOptions),
-    /// Capture traffic from a booted Android emulator
+    /// Capture traffic from the single booted Android emulator
     Android(CaptureOptions),
     /// Capture traffic from a separate browser window
     Browser(BrowserOptions),
@@ -110,7 +110,6 @@ pub fn run(ctx: &Context, args: CaptureArgs) -> anyhow::Result<()> {
         .map(|path| WorkspaceConfig::load(path))
         .transpose()?;
     capture::ca::ensure().context("create Kestrl root CA")?;
-    capture::system_proxy::restore().context("restore stale system proxy state")?;
     let history = if options.save {
         Some(Mutex::new(History::open_default()?))
     } else {

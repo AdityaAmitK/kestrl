@@ -164,7 +164,8 @@ pub fn start_browser_capture(
 }
 
 /// Route a booted simulator or emulator through a local proxy and stream its traffic. The
-/// device's proxy is restored when capture stops, and on the next start after a crash.
+/// device's proxy is restored when capture stops. If Kestrl exits unexpectedly, the next device
+/// capture start restores it. Only one device capture runs at a time, across the app and the CLI.
 #[uniffi::export]
 pub fn start_device_capture(
     options: DeviceCaptureOptions,
@@ -201,6 +202,7 @@ pub fn simulator_capture_problem() -> Option<String> {
 }
 
 /// Read Android emulator readiness without changing it. Returns the reason capture cannot start.
+/// Capture needs exactly one booted emulator; physical devices are not supported.
 #[uniffi::export]
 pub fn android_capture_problem() -> Option<String> {
     device::check_android().err().map(|error| error.to_string())
