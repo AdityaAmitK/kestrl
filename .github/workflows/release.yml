@@ -1,8 +1,11 @@
 name: Release
 
+# Tags publish a release. Pushes to main build the same artifacts without publishing, which
+# checks the release build and warms the Rust caches that tag runs restore from main.
 on:
   push:
     tags: ["v*"]
+    branches: [main]
   workflow_dispatch:
     inputs:
       tag:
@@ -13,26 +16,32 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: release-${{ inputs.tag || github.ref }}
+  cancel-in-progress: ${{ github.ref == 'refs/heads/main' }}
+
 jobs:
-  release:
-    runs-on: macos-latest
+  validate:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+      is_release: ${{ steps.release.outputs.is_release }}
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.tag || github.ref }}
-          fetch-depth: 0
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-apple-darwin, x86_64-apple-darwin
       - name: Validate version and changelog
         id: release
         env:
           RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+          IS_RELEASE: ${{ inputs.tag != '' || startsWith(github.ref, 'refs/tags/') }}
         run: |
           set -euo pipefail
-          version="${RELEASE_TAG#v}"
-          workspace_version="$(sed -n '/^\[workspace.package\]/,/^\[/s/^version = "\([^"]*\)"/\1/p' Cargo.toml | head -n 1)"
-          [[ "$version" == "$workspace_version" ]] || { echo "Tag $RELEASE_TAG does not match Cargo.toml version $workspace_version" >&2; exit 1; }
+          version="$(sed -n '/^\[workspace.package\]/,/^\[/s/^version = "\([^"]*\)"/\1/p' Cargo.toml | head -n 1)"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "is_release=$IS_RELEASE" >> "$GITHUB_OUTPUT"
+          [[ "$IS_RELEASE" == "true" ]] || exit 0
+          [[ "${RELEASE_TAG#v}" == "$version" ]] || { echo "Tag $RELEASE_TAG does not match Cargo.toml version $version" >&2; exit 1; }
           awk -v heading="## [$version]" 'index($0, heading) == 1 { found=1; next } found && /^## / { exit } found { print }' CHANGELOG.md > release-notes.md
           [[ -s release-notes.md ]] || { echo "CHANGELOG.md has no ## [$version] section" >&2; exit 1; }
           cat >> release-notes.md <<'EOF'
@@ -45,10 +54,29 @@ jobs:
 
           The app is ad-hoc signed and not notarized. macOS may block its first launch; in Privacy & Security, choose **Open Anyway**. The CLI binary is also ad-hoc signed. Updating the app may prompt again for Keychain access.
           EOF
-          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - if: steps.release.outputs.is_release == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: release-notes.md
+
+  cli:
+    needs: validate
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin, x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: release-cli
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Build universal CLI
         env:
-          VERSION: ${{ steps.release.outputs.version }}
+          VERSION: ${{ needs.validate.outputs.version }}
         run: |
           set -euo pipefail
           targets=(aarch64-apple-darwin x86_64-apple-darwin)
@@ -62,11 +90,33 @@ jobs:
           tar -C dist/cli -czf "dist/kestrl-$VERSION-macos-universal.tar.gz" kestrl LICENSE README.md kestrl-bpf.sh
           cd dist
           shasum -a 256 "kestrl-$VERSION-macos-universal.tar.gz" > "kestrl-$VERSION-macos-universal.tar.gz.sha256"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cli
+          path: dist/kestrl-*-macos-universal.tar.gz*
+          retention-days: 7
+
+  app:
+    needs: validate
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin, x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: release-app
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Install XcodeGen
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: "1"
         run: brew install xcodegen
       - name: Build and package app
         env:
-          VERSION: ${{ steps.release.outputs.version }}
+          VERSION: ${{ needs.validate.outputs.version }}
         run: |
           set -euo pipefail
           app_path="$(scripts/build-app.sh --release | tail -n 1)"
@@ -77,11 +127,28 @@ jobs:
           hdiutil create -volname Kestrl -srcfolder dist/dmg -ov -format UDZO "dist/Kestrl-$VERSION.dmg"
           cd dist
           shasum -a 256 "Kestrl-$VERSION.dmg" > "Kestrl-$VERSION.dmg.sha256"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app
+          path: dist/Kestrl-*.dmg*
+          retention-days: 7
+
+  publish:
+    needs: [validate, cli, app]
+    if: needs.validate.outputs.is_release == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ steps.release.outputs.version }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ needs.validate.outputs.version }}
         run: |
+          set -euo pipefail
           tag="v$VERSION"
           assets=(
             "dist/kestrl-$VERSION-macos-universal.tar.gz"
@@ -90,9 +157,9 @@ jobs:
             "dist/Kestrl-$VERSION.dmg.sha256"
           )
           if gh release view "$tag" >/dev/null 2>&1; then
-            gh release edit "$tag" --title "Kestrl $tag" --notes-file release-notes.md
+            gh release edit "$tag" --title "Kestrl $tag" --notes-file dist/release-notes.md
             gh release upload "$tag" "${assets[@]}" --clobber
           else
             gh release create "$tag" "${assets[@]}" \
-              --title "Kestrl $tag" --notes-file release-notes.md
+              --title "Kestrl $tag" --notes-file dist/release-notes.md
           fi
