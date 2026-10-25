@@ -88,9 +88,9 @@ app/              SwiftUI macOS app; links kestrl-ffi as an XCFramework
 | Secrets | `set_secret(name, value)`, `delete_secret(name)`, `secret_status(root)` |
 | Services and logs | `list_services()`, `read_logs(service, since_ms, grep, limit)`, `follow_logs(service, grep, sink) -> LogFollow` with `cancel()` |
 | Database | `db_connections(root)`, `db_query(root, connection, env, sql)`, `db_tables(root, connection, env)`, `db_describe(root, connection, env, table)` |
-| Browser capture | `start_browser_capture(options, sink) -> BrowserCapture` with `stop()`. `options` has the workspace root, browser, start URL, host filters and `save_to_history`; `sink` gets `on_exchange` (redacted, numbered) and `on_end(error)` |
+| Capture | `start_browser_capture`, `start_port_capture`, `start_device_capture` → `CaptureHandle` with `stop()`. Options select the workspace, source, host filters and history recording; the sink receives redacted, numbered exchanges and `on_end(error)`. Readiness helpers report BPF and device availability. |
 
-Errors are one `KestrlError` enum: `File`, `Request`, `Secret`, `History`, `InvalidInput`, each with a `message`. Browser capture reports its errors through `on_end` rather than throwing. Device capture is not exposed to the app yet.
+Errors are one `KestrlError` enum: `File`, `Request`, `Secret`, `History`, `InvalidInput`, each with a `message`. Capture reports asynchronous errors through `on_end`; startup validation can throw. Browser, port and device capture share a cancellable handle.
 
 ## Project layout
 
