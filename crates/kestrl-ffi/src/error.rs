@@ -37,6 +37,8 @@ impl From<kestrl_core::Error> for KestrlError {
             | Error::VariableCycle(_)
             | Error::EnvironmentNotFound { .. }
             | Error::EnvironmentExists { .. }
+            | Error::NameTaken { .. }
+            | Error::NotFound { .. }
             | Error::DefaultEnvironmentInUse { .. }
             | Error::Http(_)
             | Error::ServiceNotRunning { .. }

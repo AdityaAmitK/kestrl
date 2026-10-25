@@ -8,8 +8,17 @@ All notable changes are documented here. The format follows [Keep a Changelog](h
 - Edit environments in the app: create (empty or as a copy), duplicate, rename, make default and delete environments; add, edit and remove variables with {{…}} highlighting and a resolved preview; add Keychain-backed secret variables. Edits are drafts until Save (⌘S), and switching away or quitting with unsaved edits asks first.
 - `kestrl envs new|set|unset|rename|rm|default` to manage environments from the CLI. Edits keep comments and order in the TOML files and write atomically.
 
+- Profiles section in the app: create, duplicate, rename and delete profiles; edit headers and query parameters as tables; choose whether a profile applies automatically by environment and URL pattern.
+- Database connections in the app: create, edit, rename and delete connections with a URL per environment and per-environment write access.
+- Secrets section: add new secrets with +, see unused stored secrets, replace or remove values.
+- Query parameters, headers and form bodies edit as key/value tables, and request tabs show counts and open on the tab that has content.
+
+### Changed
+- Secret presence is read from Keychain attributes only, so listing secrets no longer triggers a Keychain access prompt for each secret. `kestrl secret ls` also lists stored secrets nothing references.
+
 ### Fixed
 - Error banners no longer cover pane headers and the sidebar.
+- Collapsing a request folder or a database connection no longer leaves the selected row on screen.
 
 ## [0.1.1] - 2026-10-25
 

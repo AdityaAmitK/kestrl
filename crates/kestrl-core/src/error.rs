@@ -39,6 +39,12 @@ pub enum Error {
     /// An environment with this name already exists.
     #[error("environment \"{name}\" already exists")]
     EnvironmentExists { name: String },
+    /// A profile or connection with this name already exists.
+    #[error("{kind} \"{name}\" already exists")]
+    NameTaken { kind: &'static str, name: String },
+    /// The named profile or connection does not exist.
+    #[error("{kind} \"{name}\" not found")]
+    NotFound { kind: &'static str, name: String },
     /// The default environment cannot be deleted until another one is the default.
     #[error(
         "\"{name}\" is the default environment; make another environment the default before deleting it"

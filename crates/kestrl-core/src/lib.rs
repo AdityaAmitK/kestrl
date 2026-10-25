@@ -3,6 +3,7 @@
 
 pub mod actor;
 pub mod capture;
+pub mod connection_files;
 pub mod db;
 pub mod duration;
 pub mod env;
@@ -11,10 +12,12 @@ pub mod error;
 pub mod history;
 pub mod http;
 pub mod profile;
+pub mod profile_files;
 pub mod request;
 pub mod secrets;
 pub mod send;
 pub mod services;
+pub mod toml_files;
 pub mod vars;
 pub mod workspace;
 

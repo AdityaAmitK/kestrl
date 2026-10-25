@@ -23,7 +23,7 @@ struct RequestsContentView: View {
                 .textFieldStyle(.roundedBorder).controlSize(.small)
                 .padding(8).accessibilityLabel("Find a request")
             List(selection: $store.selectedRequest) {
-                RequestTreeRows(nodes: RequestNode.build(entries), store: store)
+                RequestTreeRows(nodes: RequestNode.build(entries), store: store, isFiltering: !search.isEmpty)
             }
             .listStyle(.plain)
             .environment(\.defaultMinListRowHeight, 26)

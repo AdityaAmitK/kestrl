@@ -64,10 +64,14 @@ pub fn variable_catalog(root: &Path, env: Option<&str>) -> Result<Vec<VariableIn
     let (_, mut vars) = workspace::load_variables(root, env)?;
     let mut effective = vars.workspace.clone();
     effective.extend(vars.environment.clone());
-    let statuses = crate::secrets::referenced_in_workspace(root)?
+    let stored = crate::secrets::stored_names()?;
+    let statuses: BTreeMap<String, bool> = crate::secrets::referenced_in_workspace(root)?
         .into_iter()
-        .map(|name| Ok((name.clone(), crate::secrets::is_set(&name)?)))
-        .collect::<Result<BTreeMap<_, _>>>()?;
+        .map(|name| {
+            let is_set = stored.contains(&name);
+            (name, is_set)
+        })
+        .collect();
     let mut catalog = Vec::new();
     for (name, raw) in effective {
         let template = vars.preview_template(&raw).unwrap_or(raw);

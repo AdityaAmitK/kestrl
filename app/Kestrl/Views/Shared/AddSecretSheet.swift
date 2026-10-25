@@ -1,8 +1,11 @@
 import SwiftUI
 
-/// Add a variable whose value lives in the Keychain: the file gets `name = "{{secret:name}}"`.
-struct NewSecretVariableSheet: View {
+/// Store a new secret in the Keychain. `onAdded` runs after the value is stored, e.g. to add
+/// `name = "{{secret:name}}"` to an environment.
+struct AddSecretSheet: View {
     let store: WorkspaceStore
+    var explanation = "The value goes to the macOS Keychain. Files only store a {{secret:name}} reference, so they are safe to commit."
+    var onAdded: (String) -> Void = { _ in }
 
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""
@@ -21,7 +24,7 @@ struct NewSecretVariableSheet: View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Add secret").font(.headline)
-                Text("The value goes to the macOS Keychain. The environment file only stores a reference, so it is safe to commit.")
+                Text(explanation)
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -40,7 +43,7 @@ struct NewSecretVariableSheet: View {
                 if let problem {
                     Label(problem, systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
                 } else {
-                    Text(trimmedName.isEmpty ? "Requests use it as {{name}}." : "Requests use it as {{\(trimmedName)}}.")
+                    Text(trimmedName.isEmpty ? "Use it as {{secret:name}}." : "Use it as {{secret:\(trimmedName)}}.")
                         .foregroundStyle(.secondary)
                 }
             }
@@ -69,8 +72,7 @@ struct NewSecretVariableSheet: View {
             let isStored = await store.saveSecret(name: secretName, value: secretValue)
             isSaving = false
             guard isStored else { return }
-            store.environmentEditor.addSecret(named: secretName)
-            store.environmentEditor.secretToSet = nil
+            onAdded(secretName)
             dismiss()
         }
     }

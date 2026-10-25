@@ -20,12 +20,39 @@ pub fn get(name: &str) -> Result<String> {
 }
 
 /// Whether the Keychain holds a value for `name`.
+/// Whether the Keychain holds `name`. Reads attributes only, so it never prompts for access.
 pub fn is_set(name: &str) -> Result<bool> {
-    match get(name) {
-        Ok(_) => Ok(true),
-        Err(Error::SecretNotSet { .. }) => Ok(false),
-        Err(error) => Err(error),
-    }
+    Ok(stored_names()?.contains(name))
+}
+
+/// Names of every secret Kestrl stored in the Keychain (service "kestrl").
+/// Only item attributes are read, never values, so macOS does not ask for Keychain access.
+pub fn stored_names() -> Result<BTreeSet<String>> {
+    use security_framework::item::ItemClass;
+    use security_framework::item::ItemSearchOptions;
+    use security_framework::item::Limit;
+
+    const ITEM_NOT_FOUND: i32 = -25300;
+    let results = match ItemSearchOptions::new()
+        .class(ItemClass::generic_password())
+        .service(SERVICE)
+        .load_attributes(true)
+        .limit(Limit::All)
+        .search()
+    {
+        Ok(results) => results,
+        Err(error) if error.code() == ITEM_NOT_FOUND => return Ok(BTreeSet::new()),
+        Err(error) => {
+            return Err(Error::Keychain(keyring::Error::PlatformFailure(Box::new(
+                error,
+            ))));
+        }
+    };
+    Ok(results
+        .into_iter()
+        .filter_map(|result| result.simplify_dict())
+        .filter_map(|attributes| attributes.get("acct").cloned())
+        .collect())
 }
 
 /// Every secret name the workspace refers to: in `.kestrl/` and in request files.

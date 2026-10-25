@@ -35,7 +35,9 @@ struct EnvironmentsContentView: View {
             }
         }
         .sheet(item: $editor.nameIntent) { intent in
-            EnvironmentNameSheet(store: store, intent: intent)
+            NameSheet(kind: nameKind, intent: intent) { name, copyFrom in
+                await editor.commitName(name, intent: intent, copyFrom: copyFrom)
+            }
         }
         .confirmationDialog(
             "Delete \"\(editor.pendingDeletion ?? "")\"?",
@@ -64,6 +66,22 @@ struct EnvironmentsContentView: View {
                 await editor.load(store.inspectedEnvironment)
             }
         }
+    }
+
+    private var nameKind: NameSheetKind {
+        NameSheetKind(
+            noun: "environment",
+            validationKind: "environment",
+            directory: ".kestrl/envs",
+            existing: environments,
+            explanation: { intent in
+                switch intent {
+                case .create: return "An environment is a set of variables, such as api_url, that requests resolve when you send them."
+                case .duplicate: return "The copy keeps every variable and comment. Secret values stay in the Keychain and are shared."
+                case .rename: return "Requests keep working. If this is the default environment, the default follows the new name."
+                }
+            }
+        )
     }
 
     /// Switching away from unsaved edits asks first instead of dropping them.

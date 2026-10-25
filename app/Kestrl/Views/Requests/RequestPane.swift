@@ -3,7 +3,7 @@ import SwiftUI
 /// Editable unresolved request values. Sends never write files; Save is explicit.
 struct RequestPane: View {
     @Bindable var store: WorkspaceStore
-    @State private var part: Part = .body
+    @State private var part: Part = .params
 
     private enum Part: String, CaseIterable, Identifiable {
         case params = "Params"
@@ -14,10 +14,18 @@ struct RequestPane: View {
     }
 
     var body: some View {
+        content
+            // Re-chosen once a request's file has loaded, not while it is being edited.
+            .task(id: "\(store.selectedRequest ?? "<new>")|\(store.requestDetail?.method ?? "")|\(store.requestDetail?.url ?? "")") {
+                part = preferredPart()
+            }
+    }
+
+    private var content: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
                 Picker("Request editor", selection: $part) {
-                    ForEach(Part.allCases) { Text($0.rawValue).tag($0) }
+                    ForEach(Part.allCases) { Text(title(for: $0)).tag($0) }
                 }
                 .pickerStyle(.segmented).labelsHidden().fixedSize()
                 Spacer()
@@ -36,14 +44,16 @@ struct RequestPane: View {
             Divider()
             switch part {
             case .params:
-                editor($store.requestDraft.query, label: "Query parameters", hint: "name=value · one parameter per line")
+                table($store.requestDraft.query, separator: "=", key: "parameter")
             case .headers:
-                editor($store.requestDraft.headers, label: "Request headers", hint: "Content-Type: application/json · one header per line")
+                table($store.requestDraft.headers, separator: ":", key: "header")
             case .body:
                 if store.requestDraft.bodyKind == "none" {
                     EmptyPane("No request body", systemImage: "doc", description: Text("Choose JSON, text or form above to include a body."))
+                } else if store.requestDraft.bodyKind == "form" {
+                    table($store.requestDraft.body, separator: "=", key: "field")
                 } else {
-                    editor($store.requestDraft.body, label: "Request body", hint: store.requestDraft.bodyKind == "form" ? "name=value · one field per line" : "Request body · {{variables}} and {{secret:name}} are resolved when sent")
+                    editor($store.requestDraft.body, label: "Request body", hint: "Request body · {{variables}} and {{secret:name}} are resolved when sent")
                 }
             case .options:
                 Form {
@@ -55,6 +65,41 @@ struct RequestPane: View {
                 .formStyle(.grouped)
             }
         }
+    }
+
+    private func table(_ value: Binding<String>, separator: Character, key: String) -> some View {
+        KeyValueLinesEditor(
+            text: value,
+            separator: separator,
+            keyPlaceholder: key,
+            valuePlaceholder: "value",
+            variables: store.editorVariables,
+            environmentName: store.selectedEnvironment
+        )
+        .background(Color(nsColor: .textBackgroundColor))
+    }
+
+    /// Tab titles carry counts, so a request's params and headers are visible without opening each tab.
+    private func title(for part: Part) -> String {
+        switch part {
+        case .params: return count(store.requestDraft.query).map { "Params \($0)" } ?? "Params"
+        case .headers: return count(store.requestDraft.headers).map { "Headers \($0)" } ?? "Headers"
+        case .body: return store.requestDraft.bodyKind == "none" ? "Body" : "Body ●"
+        case .options: return "Options"
+        }
+    }
+
+    private func count(_ lines: String) -> Int? {
+        let total = lines.split(separator: "\n").filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }.count
+        return total > 0 ? total : nil
+    }
+
+    /// Opens the tab that has content: the body when there is one, else params, else headers.
+    private func preferredPart() -> Part {
+        if store.requestDraft.bodyKind != "none" { return .body }
+        if count(store.requestDraft.query) != nil { return .params }
+        if count(store.requestDraft.headers) != nil { return .headers }
+        return .params
     }
 
     private func editor(_ value: Binding<String>, label: String, hint: String) -> some View {

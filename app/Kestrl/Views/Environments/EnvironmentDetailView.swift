@@ -22,7 +22,13 @@ struct EnvironmentDetailView: View {
                 footer
             }
             .sheet(isPresented: $isAddingSecret) {
-                NewSecretVariableSheet(store: store)
+                AddSecretSheet(
+                    store: store,
+                    explanation: "The value goes to the macOS Keychain. The environment file only stores a reference, so it is safe to commit."
+                ) { name in
+                    editor.addSecret(named: name)
+                    editor.secretToSet = nil
+                }
             }
             .sheet(item: Binding(
                 get: { editor.secretToSet.map(SecretName.init) },
@@ -120,7 +126,9 @@ struct EnvironmentDetailView: View {
             Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 8) {
                 GridRow {
                     Text("Name")
+                        .frame(minWidth: 140, idealWidth: 180, maxWidth: 220, alignment: .leading)
                     Text("Value")
+                        .frame(minWidth: 220, maxWidth: .infinity, alignment: .leading)
                     Text("Resolves to")
                     Color.clear.frame(width: 20, height: 1)
                 }

@@ -110,6 +110,12 @@ struct ContentView: View {
             } second: {
                 EnvironmentDetailView(store: store)
             }
+        case .profiles:
+            AutosavingSplit(autosaveName: "kestrl.profiles.list.v1", axis: .horizontal, firstPaneWidth: .content) {
+                ProfilesContentView(store: store)
+            } second: {
+                ProfileDetailView(store: store)
+            }
         case .secrets:
             AutosavingSplit(autosaveName: "kestrl.secrets.list.v4", axis: .horizontal, firstPaneWidth: .content) {
                 SecretsContentView(store: store)

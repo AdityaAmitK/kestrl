@@ -16,6 +16,8 @@ final class WorkspaceStore {
     private(set) var workspace: WorkspaceInfo?
     /// Draft edits and actions for the Environments section.
     @ObservationIgnored private(set) lazy var environmentEditor = EnvironmentEditor(store: self)
+    /// Draft edits and actions for the Profiles section.
+    @ObservationIgnored private(set) lazy var profileEditor = ProfileEditor(store: self)
     private(set) var requestTree: [RequestNode] = []
     private(set) var requestDetail: RequestDetail?
     private(set) var requestBody: PreparedBody?
@@ -125,7 +127,7 @@ final class WorkspaceStore {
         switch section {
         case .requests: return response != nil
         case .history: return eventDetail?.detail.http != nil
-        case .capture, .logs, .database, .environments, .secrets: return false
+        case .capture, .logs, .database, .environments, .profiles, .secrets: return false
         }
     }
 
@@ -264,6 +266,8 @@ final class WorkspaceStore {
             break
         case .environments:
             if inspectedEnvironment == nil { inspectedEnvironment = selectedEnvironment }
+        case .profiles:
+            break
         case .secrets:
             await loadSecrets()
         case .logs:
@@ -685,6 +689,26 @@ final class WorkspaceStore {
         }
     }
 
+    /// Reloads connections after one was created or edited, and selects it.
+    func connectionsChanged(selecting name: String) async {
+        tablesByConnection[name] = nil
+        await loadConnections()
+        selectedDatabaseItem = .connection(name)
+    }
+
+    func deleteConnection(_ name: String) async {
+        guard let root = workspace?.root else { return }
+        do {
+            try await KestrlBridge.run { try Kestrl.deleteConnection(workspaceRoot: root, name: name) }
+            if selectedConnection == name { selectedDatabaseItem = nil }
+            expandedConnections.remove(name)
+            tablesByConnection[name] = nil
+            await loadConnections()
+        } catch {
+            report(error)
+        }
+    }
+
     func setConnectionExpanded(_ name: String, expanded: Bool) {
         if expanded {
             expandedConnections.insert(name)
@@ -826,7 +850,7 @@ final class WorkspaceStore {
                 redacted: http.redacted,
                 error: http.error
             )
-        case .capture, .environments, .secrets, .logs, .database:
+        case .capture, .environments, .profiles, .secrets, .logs, .database:
             return nil
         }
     }
