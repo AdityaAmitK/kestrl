@@ -45,8 +45,8 @@ install -m 755 "$tmp/kestrl" "$install_dir/kestrl"
 case ":$PATH:" in
     *:"$install_dir":*) ;;
     *)
-        printf 'Add %s to PATH, for example:\n  export PATH="%s:' "$install_dir" "$install_dir"
-        printf '%s"\n' "$PATH"
+        # Single quotes keep $PATH literal so the hint can be pasted as is.
+        printf 'Add %s to your PATH, for example:\n  export PATH="%s:$PATH"\n' "$install_dir" "$install_dir"
         ;;
 esac
 "$install_dir/kestrl" --version
