@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="description" content="Kestrl is a fast, local-first backend workbench for developers and AI agents. Requests, history, logs, databases and capture share one macOS workspace.">
+  <title>Kestrl — backend workbench</title>
+  <link rel="icon" href="assets/mark.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+  <script src="script.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header page">
+    <a class="brand" href="index.html"><img src="assets/mark.svg" alt=""><span>Kestrl</span></a>
+    <nav class="nav" aria-label="Main navigation">
+      <a href="docs/index.html">Docs</a>
+      <a class="optional" href="docs/cli.html">CLI</a>
+      <a href="https://github.com/AdityaAmitK/kestrl">GitHub</a>
+    </nav>
+  </header>
+
+  <main id="main">
+    <section class="hero page">
+      <div class="hero-copy">
+        <h1>Backend work, kept local.</h1>
+        <p>One macOS workbench for requests, service logs, Postgres and traffic capture. Use the same workspace from your terminal, your app or your coding agent.</p>
+        <div class="actions">
+          <a class="action" href="docs/index.html">Read the docs</a>
+          <a class="action-quiet" href="https://github.com/AdityaAmitK/kestrl">View source</a>
+        </div>
+      </div>
+      <div class="terminal" aria-label="Terminal example">
+        <div class="terminal-top"><span class="terminal-controls" aria-hidden="true"><span></span><span></span><span></span></span><span>kestrl · local</span></div>
+        <pre><span class="comment"># Send an ad hoc request</span>
+<span class="command">$ kestrl send GET '{{api_url}}/health' -e local</span>
+{
+  "id": "01J8Q6M2W7R4",
+  "status": 200,
+  "ms": 84,
+  "headers": { "content-type": "application/json" },
+  "body": { "ok": true },
+  "redacted": ["local_token"],
+  "error": null
+}
+
+<span class="comment"># Find the event in shared history</span>
+<span class="command">$ kestrl history --since 1h</span>
+        <span class="ok">01J8Q6M2W7R4   4s  me    GET /health 200 84ms</span></pre>
+        <p class="terminal-caption">The token used by this request was masked in output and stored history.</p>
+      </div>
+    </section>
+
+    <section class="section section-tint" id="workbench">
+      <div class="page">
+        <div class="section-heading">
+          <h2>One workspace, six tools.</h2>
+          <p>Kestrl keeps the everyday backend loop close at hand. Project files stay in your repository; history and live buffers stay on your Mac.</p>
+        </div>
+        <div class="feature-grid">
+          <article class="feature"><h3>Requests &amp; environments</h3><p>Save TOML request files, resolve variables and profiles, and send against named environments.</p></article>
+          <article class="feature"><h3>History with actors</h3><p>Search, replay, compare and tag requests. Events show whether you, Codex, Claude Code or Cursor ran them.</p></article>
+          <article class="feature"><h3>Service logs</h3><p>Start a process through Kestrl or attach to a log file or Docker container. Tail and filter the live buffer.</p></article>
+          <article class="feature"><h3>Database console</h3><p>Query PostgreSQL and inspect tables. Connections are workspace files; writes are disabled unless an environment allows them.</p></article>
+          <article class="feature"><h3>Traffic capture</h3><p>Capture simulator, emulator and browser traffic, or plain HTTP on a local port.</p></article>
+          <article class="feature"><h3>macOS app</h3><p>Edit requests, inspect history, read logs, query databases and capture traffic in a native SwiftUI app.</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section page" aria-labelledby="agents-title">
+      <div class="demo-wrap">
+        <div class="demo-copy">
+          <h2 id="agents-title">Made for the agent loop.</h2>
+          <p>Agents call <code>kestrl</code> instead of <code>curl</code>. Each request lands in the same history as app activity, with an actor attached and secrets masked before they reach output.</p>
+          <div class="actor-picker" role="group" aria-label="Show request actor">
+            <button type="button" data-actor="me" aria-pressed="true">Human</button>
+            <button type="button" data-actor="codex" aria-pressed="false">Codex</button>
+          </div>
+          <p class="screen-reader" aria-live="polite">Event actor: <span id="actor-name">me</span></p>
+        </div>
+        <div class="live-output" data-ui>
+          <header><span>history event</span><span id="actor-label">actor: <span id="actor-name-visible">me</span></span></header>
+          <pre id="actor-output" aria-live="polite">{
+  "id": "01J8Q6M2W7R4",
+  "kind": "http",
+  "source": "cli",
+  "actor": "me",
+  "env": "local",
+  "summary": "GET /health 200 84ms",
+  "tags": []
+}</pre>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-tint">
+      <div class="page call-response">
+        <h2>Call. Record. Return.</h2>
+        <div>
+          <p>A send is both a request and a durable event. Find it later by time, actor, session or tag; replay saved requests with secrets resolved again from the Keychain.</p>
+          <div class="snippet">$ kestrl history --by codex --since 1h<br>$ kestrl history replay 01J8Q6M2W7R4</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="agents-band">
+      <div class="page agents-inner">
+        <h2>Private by default.</h2>
+        <div>
+          <p>Kestrl has no accounts, cloud sync or telemetry. Workspace configuration and request files can live in git. Credentials stay in the macOS Keychain and are injected only when a request runs.</p>
+          <div class="agent-facts"><span>Local history in SQLite</span><span>Secrets masked in output and storage</span><span>MIT OR Apache-2.0</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section page" id="install">
+      <div class="install-layout">
+        <div><h2>Start from source.</h2><p>Kestrl is open source and built for macOS. Install the CLI with Cargo, or build the native app from the repository.</p><p><a href="docs/index.html">Quick start and workspace setup →</a></p></div>
+        <div class="code-block"><pre><code>git clone https://github.com/AdityaAmitK/kestrl
+cd kestrl
+cargo install --path crates/kestrl-cli</code></pre><div class="copy-row"><button class="copy-button" type="button" data-copy>Copy</button></div><p>Build the app with <code>scripts/build-app.sh</code>.</p></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="page footer-row"><span>Kestrl · local backend workbench</span><nav class="footer-links" aria-label="Footer navigation"><a href="docs/index.html">Docs</a><a href="docs/concepts.html">Concepts</a><a href="docs/cli.html">CLI reference</a><a href="docs/agents.html">Agent skill</a><a href="docs/capture.html">Capture</a><a href="https://github.com/AdityaAmitK/kestrl">GitHub</a></nav><span>MIT OR Apache-2.0</span></div>
+  </footer>
+</body>
+</html>
