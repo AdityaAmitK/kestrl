@@ -263,10 +263,42 @@ final class WorkspaceStore {
         }
     }
 
+    /// A captured exchange becomes an unresolved draft, never an automatic resend.
+    func useCapturedRequest(_ exchange: CapturedExchange) {
+        let newKey = "\(workspace?.root ?? "")|<new>"
+        if let previous = requestDrafts[newKey], previous != RequestEditorDraft() {
+            let alert = NSAlert()
+            alert.messageText = "Replace the unsaved request draft?"
+            alert.informativeText = "Save the existing draft first to keep it. The captured request opens without sending."
+            alert.addButton(withTitle: "Keep draft")
+            alert.addButton(withTitle: "Replace draft")
+            guard alert.runModal() == .alertSecondButtonReturn else { return }
+        }
+        newRequest()
+        var draft = RequestEditorDraft()
+        draft.name = "Captured \(exchange.method)"
+        draft.method = exchange.method
+        draft.url = exchange.url
+        let omitted = ["host", "content-length", "connection", "accept-encoding", "transfer-encoding"]
+        draft.headers = exchange.requestHeaders.filter { !omitted.contains($0.key.lowercased()) }
+            .map { "\($0.key): \($0.value)" }.joined(separator: "\n")
+        if let body = exchange.requestBody, !body.isEmpty {
+            draft.body = body
+            draft.bodyKind = exchange.requestHeaders.contains {
+                $0.key.lowercased() == "content-type" && $0.value.lowercased().contains("json")
+            } ? "json" : "text"
+        }
+        requestDraft = draft
+    }
+
     /// Sends the current draft without writing it to disk.
     func sendCurrentRequest() async {
         guard canSendRequest, let root = workspace?.root else { return }
         do {
+            let values = [requestDraft.url, requestDraft.headers, requestDraft.query, requestDraft.body, requestDraft.profiles]
+            guard !values.contains(where: { $0.contains("••••••") }) else {
+                throw KestrlError.InvalidInput(message: "Replace masked values with {{secret:name}} references before sending this request.")
+            }
             let draft = try requestDraft.record()
             let env = selectedEnvironment
             let path = selectedRequest
@@ -288,6 +320,7 @@ final class WorkspaceStore {
 
     func discardRequestDraft() async {
         errorMessage = nil
+        response = nil
         requestDrafts.removeValue(forKey: draftKey)
         if selectedRequest != nil { await requestSelectionChanged() }
     }

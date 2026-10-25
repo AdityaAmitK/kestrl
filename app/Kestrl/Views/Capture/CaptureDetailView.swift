@@ -3,6 +3,7 @@ import SwiftUI
 /// The selected exchange: its status and timing, then the request or response as body or headers, with Copy JSON.
 struct CaptureDetailView: View {
     @Bindable var capture: CaptureStore
+    let store: WorkspaceStore
     @State private var side: Side = .response
     @State private var part: Part = .body
     @State private var preparedBody: PreparedBody?
@@ -45,19 +46,23 @@ struct CaptureDetailView: View {
                     .fixedSize()
                     Spacer()
                 }
-                .padding(10)
+                .controlSize(.small)
+                .padding(8)
                 content(for: exchange)
             }
             .task(id: "\(exchange.seq)-\(side.rawValue)") {
-                let raw = side == .request ? exchange.requestBody : exchange.responseBody
+                preparedBody = nil
+                let selection = exchange.seq
+                let desiredSide = side
+                let raw = desiredSide == .request ? exchange.requestBody : exchange.responseBody
                 if let raw {
-                    preparedBody = await PreparedBody.prepare(raw)
-                } else {
-                    preparedBody = nil
+                    let prepared = await PreparedBody.prepare(raw)
+                    guard !Task.isCancelled, capture.selectedSeq == selection, side == desiredSide else { return }
+                    preparedBody = prepared
                 }
             }
         } else {
-            ContentUnavailableView(
+            EmptyPane(
                 "Select an exchange",
                 systemImage: "dot.radiowaves.left.and.right",
                 description: Text("Its headers, body and status appear here.")
@@ -74,6 +79,10 @@ struct CaptureDetailView: View {
                     .textSelection(.enabled)
                     .lineLimit(2)
                 Spacer()
+                Button("Use as request", systemImage: "square.and.pencil") {
+                    store.useCapturedRequest(exchange)
+                }
+                .help("Open an editable request draft; sending remains explicit")
                 Button {
                     capture.copySelectedJSON()
                 } label: {
@@ -100,7 +109,7 @@ struct CaptureDetailView: View {
                     .textSelection(.enabled)
             }
         }
-        .padding(16)
+        .padding(12)
     }
 
     @ViewBuilder private func content(for exchange: CapturedExchange) -> some View {
@@ -109,17 +118,17 @@ struct CaptureDetailView: View {
             if let preparedBody, !preparedBody.text.isEmpty {
                 JSONTextView(text: preparedBody.text)
             } else {
-                ContentUnavailableView("No body", systemImage: "doc.plaintext")
+                EmptyPane("No body", systemImage: "doc.plaintext")
             }
         case .headers:
             let headers = side == .request ? exchange.requestHeaders : exchange.responseHeaders
             if headers.isEmpty {
-                ContentUnavailableView("No headers", systemImage: "list.bullet.rectangle")
+                EmptyPane("No headers", systemImage: "list.bullet.rectangle")
             } else {
                 ScrollView {
                     KeyValueGrid(title: side.rawValue, pairs: headers)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(16)
+                        .padding(12)
                 }
             }
         }

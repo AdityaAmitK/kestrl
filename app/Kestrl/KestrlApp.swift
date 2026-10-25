@@ -10,9 +10,9 @@ struct KestrlApp: App {
     var body: some Scene {
         WindowGroup("Kestrl") {
             ContentView(store: store, capture: capture)
-                .onAppear { lifecycle.store = store }
-                .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
-                    capture.stopForQuit()
+                .onAppear {
+                    lifecycle.store = store
+                    lifecycle.capture = capture
                 }
         }
         .defaultSize(width: 1200, height: 760)

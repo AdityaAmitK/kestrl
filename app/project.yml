@@ -42,6 +42,7 @@ targets:
         GENERATE_INFOPLIST_FILE: NO
         OTHER_LDFLAGS:
           - -lresolv
+          - -lpcap
           - -framework
           - Security
           - -framework

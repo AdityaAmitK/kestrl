@@ -5,16 +5,19 @@ All notable changes are documented here. The format follows [Keep a Changelog](h
 ## [Unreleased]
 
 ### Fixed
+- Device capture takes an exclusive, cross-process lock before it touches any device proxy setting. A second `kestrl capture` or app capture fails with a clear error instead of restoring the first capture's proxy.
+- `kestrl capture android` targets exactly one booted emulator, pins every `adb` call to it, and fails when none or several are running. Physical devices are no longer accepted.
+- `kestrl capture android` saves the emulator's previous global `http_proxy` before changing it and restores that value on stop, instead of overwriting it with `:0`. A saved record survives a crash and is restored on the next device capture start; if the emulator is not running, the start fails and keeps the record.
 - `kestrl capture browser` stops on Ctrl-C through a per-capture stop flag instead of a process-wide interrupt, so the app can start and stop captures repeatedly. A stop also ends the wait for a response body that the browser never sends.
-- macOS app: the list column of each section starts at 280 pt (220–420 pt) instead of about 45% of the window; the sidebar is 180–240 pt. Log lines stay on one row, with horizontal scrolling, unless View ▸ Wrap log lines (⌥⌘W) is on.
+- macOS app: the list column of each section starts at 240 pt (200–340 pt) instead of about 45% of the window; the sidebar is 180–240 pt. Log lines stay on one row, with horizontal scrolling, unless View ▸ Wrap log lines (⌥⌘W) is on.
 - macOS app: auto-follow keeps log timestamps visible and only pauses on user scrolling; Clear resumes following new output.
 - Browser capture removes abandoned `kestrl-browser-*` temporary profiles when no browser process is using them; device and browser capture lines display full URLs without default HTTP(S) ports.
 
 ### Added
 - macOS request editor: editable method, URL, headers, query params, JSON/text/form bodies and profiles; send without saving, explicit Save/Save As, in-memory drafts, external-edit protection and confirmation before quitting with unsaved edits.
 - macOS workbench: compact pane headers and empty states, searchable request collection, persistent top request bar, syntax-colored response bodies, and on-demand table columns.
+- macOS app: Capture section captures from a browser, a loopback port, an iOS Simulator or an Android emulator. Pick a source and only its controls show; Start and Stop run one capture at a time. Exchanges appear live (newest first), with status, timing, headers, body, Copy JSON, and an opt-in Save to history. Device capture restores the device proxy on Stop, on quit and after an error. Port capture shows its one-time BPF setup command for you to run in Terminal; the app never runs it. Changing workspace stops the capture.
 - `kestrl capture port <port>` plain-HTTP loopback packet capture with bounded TCP reassembly, HTTP/1 framing, host filtering, shared secret redaction and optional history recording. macOS BPF access uses a one-time administrator setup, `sudo sh scripts/kestrl-bpf.sh install --user <name>`, which creates a dedicated `kestrl_bpf` group and a root-owned boot-time LaunchDaemon. Membership lets that user read all interfaces through BPF, not only loopback. `kestrl capture port setup|status|uninstall` report the plan, the current access, and the removal command without changing system state.
-- macOS app: Capture section runs browser capture: pick a browser, a start URL and host filters, then Start and Stop. Exchanges appear live (newest first, up to 500), with status, timing, headers, body, Copy JSON, and an opt-in Save to history. Quitting the app closes the capture browser first.
 - macOS app: Logs section streams a running service's log with a local-time gutter, stderr marking, pause-on-scroll, regex filter, and Copy and Clear.
 - macOS app: a JSON log line with `level` and `message` shows a level chip, the message, then its other keys as `key=value`. The raw line shows on hover and is what Copy copies.
 - macOS app: Database section lists connections and their tables, runs SQL with ⌘↩, shows results as a table with Copy JSON, and previews a table's columns.
@@ -42,6 +45,8 @@ All notable changes are documented here. The format follows [Keep a Changelog](h
 - `kestrl-ffi::read_request_file` returns a request as written, with variables unresolved.
 
 ### Changed
+- `kestrl capture sim|android|port` stop on Ctrl-C through the CLI's own handler. `kestrl-core` device capture takes a stop flag instead of installing signal handlers, so the app can stop it without a process-wide handler.
+- macOS app capture lists keep at most 16 MB of text as well as 500 exchanges, and show how many exchanges were dropped.
 - macOS app: History is a full-width table (Time, Status, Method, Summary, Actor, Source, Tags, Duration) with event detail below it. Request files show their URL template in a top bar with a labeled Send (⌘↩); ad-hoc requests open from File ▸ New Request (⌘N). Responses sit below the request in a resizable split that remembers its position. The toolbar shows the environment name, and Copy JSON moved to the pane it copies.
 - `history --json` events include `method`, `status` and `duration_ms` for HTTP events (null otherwise).
 - `--since` accepts seconds (`30s`) as well as minutes, hours and days.

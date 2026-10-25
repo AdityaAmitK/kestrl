@@ -16,6 +16,9 @@ struct ContentView: View {
         }
         .frame(minWidth: 960, minHeight: 600)
         .preferredColorScheme(store.appearance.colorScheme)
+        .onChange(of: store.workspace?.root) { _, _ in
+            capture.stopForWorkspaceChange()
+        }
         .onChange(of: store.isShowingOpenPanel) { _, isShowing in
             guard isShowing else { return }
             store.isShowingOpenPanel = false
@@ -79,7 +82,7 @@ struct ContentView: View {
             AutosavingSplit(autosaveName: "kestrl.capture.exchanges.v1", axis: .horizontal, firstPaneWidth: PaneWidth(minimum: 300, ideal: 340, maximum: 460)) {
                 CaptureContentView(capture: capture, workspaceRoot: store.workspace?.root)
             } second: {
-                CaptureDetailView(capture: capture)
+                CaptureDetailView(capture: capture, store: store)
             }
         case .logs:
             AutosavingSplit(autosaveName: "kestrl.logs.services.v4", axis: .horizontal, firstPaneWidth: .content) {

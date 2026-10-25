@@ -8,7 +8,7 @@ struct SidebarView: View {
         VStack(spacing: 0) {
             List(selection: $store.section) {
                 Section("Workbench") {
-                    ForEach([SidebarSection.requests, .history, .logs, .database]) { section in
+                    ForEach([SidebarSection.requests, .history, .capture, .logs, .database]) { section in
                         Label(section.title, systemImage: section.symbol).tag(section)
                     }
                 }

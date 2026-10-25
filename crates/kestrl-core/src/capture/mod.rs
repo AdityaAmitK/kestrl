@@ -6,6 +6,7 @@ pub mod device;
 pub mod port;
 pub mod proxy;
 pub mod session;
+pub mod state;
 pub mod system_proxy;
 
 /// One completed request and response observed by the proxy.

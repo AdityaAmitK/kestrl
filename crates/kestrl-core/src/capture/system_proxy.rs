@@ -1,13 +1,11 @@
 //! Transactional macOS system proxy changes with crash recovery.
 
-use std::fs::OpenOptions;
-use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command;
 
-use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 
+use super::state;
 use crate::{Error, Result};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -27,23 +25,7 @@ struct ServiceSettings {
 }
 
 fn state_path() -> Result<PathBuf> {
-    let dir = match std::env::var_os("KESTRL_RUN_DIR") {
-        Some(path) => PathBuf::from(path),
-        None => {
-            let project = ProjectDirs::from("", "", "kestrl").ok_or(Error::NoDataDir)?;
-            project
-                .runtime_dir()
-                .map(PathBuf::from)
-                .unwrap_or_else(|| project.data_dir().join("run"))
-        }
-    };
-    std::fs::create_dir_all(&dir)?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700))?;
-    }
-    Ok(dir.join("system-proxy.json"))
+    Ok(state::run_dir()?.join("system-proxy.json"))
 }
 
 fn output(arguments: &[&str]) -> Result<String> {
@@ -140,24 +122,7 @@ pub fn enable(port: u16) -> Result<()> {
         .collect::<Result<Vec<_>>>()?;
     let path = state_path()?;
     let bytes = serde_json::to_vec_pretty(&ProxyState { settings })?;
-    #[cfg(unix)]
-    let mut file = {
-        use std::os::unix::fs::OpenOptionsExt;
-        OpenOptions::new()
-            .create(true)
-            .truncate(true)
-            .write(true)
-            .mode(0o600)
-            .open(&path)?
-    };
-    #[cfg(not(unix))]
-    let mut file = OpenOptions::new()
-        .create(true)
-        .truncate(true)
-        .write(true)
-        .open(&path)?;
-    file.write_all(&bytes)?;
-    file.sync_all()?;
+    state::write_private(&path, &bytes)?;
     let state: ProxyState = serde_json::from_slice(&std::fs::read(&path)?)?;
     for entry in state.settings {
         let change = (|| {
