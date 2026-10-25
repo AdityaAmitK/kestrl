@@ -199,7 +199,14 @@ pub fn run(ctx: &Context, args: CaptureArgs) -> anyhow::Result<()> {
 
 fn run_port(ctx: &Context, options: PortOptions) -> anyhow::Result<()> {
     match options.action {
-        Some(PortAction::Setup) => anyhow::bail!("{}", kestrl_core::capture::port::setup_status()),
+        Some(PortAction::Setup) => {
+            writeln!(
+                std::io::stdout().lock(),
+                "{}",
+                kestrl_core::capture::port::setup_status()
+            )?;
+            Ok(())
+        }
         Some(PortAction::Status) => {
             writeln!(
                 std::io::stdout().lock(),

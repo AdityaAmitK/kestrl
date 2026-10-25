@@ -2,7 +2,7 @@
 
 A fast, local-first workbench for backend development, built for developers and AI agents.
 
-Kestrl puts an API client, request history, service logs, a Postgres console and traffic capture (iOS Simulator, Android emulator, browser, local ports) into one tool. Every feature has a CLI and a macOS app over the same data, so agents like Claude Code, Codex and Cursor can use `kestrl` instead of `curl`. Secrets stay in the macOS Keychain and are masked in all output. Plain-HTTP port capture is implemented for macOS loopback, but BPF access needs privilege. No safe one-time setup is available under the current restrictions on BPF permissions, groups, privileged helpers, and launch daemons. `kestrl capture port setup|status|uninstall` reports this blocker without changing system state; a separately approved signed helper is required before capture can start.
+Kestrl puts an API client, request history, service logs, a Postgres console and traffic capture (iOS Simulator, Android emulator, browser, local ports) into one tool. Every feature has a CLI and a macOS app over the same data, so agents like Claude Code, Codex and Cursor can use `kestrl` instead of `curl`. Secrets stay in the macOS Keychain and are masked in all output. Plain-HTTP port capture reads macOS loopback through BPF, which needs a one-time administrator setup from a checkout: `sudo sh scripts/kestrl-bpf.sh install --user <name>`. It creates a dedicated `kestrl_bpf` group. Members of that group can read every interface through BPF, not only loopback. `kestrl capture port setup|status|uninstall` shows the plan, the current access, and the removal steps.
 
 > **Status:** early development. See [PLAN.md](PLAN.md) for the design and roadmap.
 

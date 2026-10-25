@@ -2,6 +2,7 @@
 
 use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::net::{Ipv4Addr, Ipv6Addr};
+use std::path::Path;
 use std::sync::{
     Arc,
     atomic::{AtomicBool, Ordering},
@@ -122,12 +123,26 @@ pub fn run_cancellable(
     }
 }
 
-/// Report the current BPF access constraint without changing system state.
+/// Installed copy of `scripts/kestrl-bpf.sh`, root-owned, at a fixed path.
+const HELPER_PATH: &str = "/Library/Application Support/Kestrl/kestrl-bpf.sh";
+/// LaunchDaemon that re-applies `kestrl_bpf` access to BPF devices at boot.
+const LAUNCH_DAEMON_PATH: &str = "/Library/LaunchDaemons/dev.kestrl.bpf.plist";
+const SETUP_COMMAND: &str = "sudo sh scripts/kestrl-bpf.sh install --user <your-username>";
+const UNINSTALL_COMMAND: &str = "sudo sh scripts/kestrl-bpf.sh uninstall --user <your-username>";
+
+/// Describe the one-time BPF setup without changing system state.
 pub fn setup_status() -> String {
-    "Port capture uses macOS BPF and requires membership in the `access_bpf` group. Setup requires an administrator to install the system ChmodBPF package or an equivalent reviewed configuration. This command does not change system state.".to_owned()
+    format!(
+        "Port capture reads loopback packets through macOS BPF devices, which are root-only by default. \
+Run this once from a Kestrl checkout with administrator authorization. Kestrl does not run it for you:\n\n  {SETUP_COMMAND}\n\n\
+The script creates the `kestrl_bpf` group, adds the named user, and installs a root-owned copy at `{HELPER_PATH}` with a LaunchDaemon that grants the group access to /dev/bpf* at each boot. \
+It refuses to run while Wireshark's ChmodBPF is installed. \
+Group members can read every packet on every interface through BPF, not only lo0. Kestrl's capture filter limits what Kestrl reads, not what the group can read. \
+Log out and back in after setup. This command does not change system state."
+    )
 }
 
-/// Report whether a privileged port-capture helper is installed.
+/// Report whether BPF access is available and whether the Kestrl setup is installed.
 pub fn status() -> String {
     let accessible = std::fs::read_dir("/dev").ok().is_some_and(|entries| {
         entries.flatten().any(|entry| {
@@ -141,6 +156,8 @@ pub fn status() -> String {
     });
     if accessible {
         "Port capture status: BPF device access is available to this process.".to_owned()
+    } else if setup_installed() {
+        "Port capture status: unavailable to this process. The Kestrl BPF setup is installed; if you were just added to `kestrl_bpf`, log out and back in. Run `kestrl capture port setup` to review the setup.".to_owned()
     } else {
         format!(
             "Port capture status: unavailable to this process. {}",
@@ -149,9 +166,19 @@ pub fn status() -> String {
     }
 }
 
-/// Remove a port-capture helper if one exists.
+/// Describe how to remove the Kestrl BPF setup, without changing system state.
 pub fn uninstall() -> Result<String> {
-    Ok("No Kestrl-owned privileged component is installed; the system ChmodBPF setup is not managed by Kestrl.".to_owned())
+    if !setup_installed() {
+        return Ok("No Kestrl BPF setup is installed; nothing to remove.".to_owned());
+    }
+    Ok(format!(
+        "The Kestrl BPF setup is installed. Remove it from the same checkout with administrator authorization. Kestrl does not run it for you:\n\n  {UNINSTALL_COMMAND}\n\n\
+This removes your membership. When no members of `kestrl_bpf` remain, it also unloads the LaunchDaemon, removes the installed script and group, and restores the /dev/bpf* devices it assigned to root:wheel 0600. Other BPF access, including Wireshark's ChmodBPF, is not changed."
+    ))
+}
+
+fn setup_installed() -> bool {
+    Path::new(HELPER_PATH).exists() || Path::new(LAUNCH_DAEMON_PATH).exists()
 }
 
 fn capture_error(error: pcap::Error) -> Error {
