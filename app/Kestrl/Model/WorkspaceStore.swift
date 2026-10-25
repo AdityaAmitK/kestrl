@@ -18,6 +18,7 @@ final class WorkspaceStore {
     private(set) var requestDetail: RequestDetail?
     private(set) var requestBody: PreparedBody?
     private(set) var secrets: [SecretStatus] = []
+    private(set) var editorVariables: [VariableInfo] = []
     private(set) var resolvedVariables: [KeyValue] = []
     private(set) var events: [EventSummary] = []
     private(set) var knownActors: [String] = []
@@ -190,6 +191,7 @@ final class WorkspaceStore {
                 selectedEnvironment = info.envs.contains(info.defaultEnv ?? "") ? info.defaultEnv : info.envs.first
             }
             errorMessage = nil
+            await loadEditorVariables()
         } catch {
             report(error)
         }
@@ -490,6 +492,17 @@ final class WorkspaceStore {
         }
     }
 
+    func loadEditorVariables() async {
+        editorVariables = []
+        guard let root = workspace?.root else { return }
+        let env = selectedEnvironment
+        do {
+            let found = try await KestrlBridge.run { try variableCatalog(workspaceRoot: root, env: env) }
+            guard workspace?.root == root, selectedEnvironment == env else { return }
+            editorVariables = found
+        } catch { report(error) }
+    }
+
     func loadSecrets() async {
         guard let root = workspace?.root else {
             secrets = []
@@ -498,6 +511,7 @@ final class WorkspaceStore {
         do {
             let found = try await KestrlBridge.run { try secretStatus(workspaceRoot: root) }
             secrets = found.sorted { $0.name < $1.name }
+            await loadEditorVariables()
         } catch {
             report(error)
         }
@@ -690,6 +704,7 @@ final class WorkspaceStore {
 
     /// Environment changes alter what the database returns, so the table lists and result are reloaded.
     func environmentChanged() async {
+        await loadEditorVariables()
         queryResult = nil
         tablesByConnection = [:]
         for name in expandedConnections {

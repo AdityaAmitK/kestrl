@@ -4,6 +4,9 @@ All notable changes are documented here. The format follows [Keep a Changelog](h
 
 ## [Unreleased]
 
+### Added
+- macOS request fields highlight variables, secret references and undefined names, with fast hover cards and caret-anchored `{{` completions showing resolved values and secret presence.
+
 ### Changed
 - Website adds agent-assisted CLI and skill setup, feature descriptions, and demo app and CLI views.
 - Release builds of the macOS app are universal (Apple Silicon and Intel).

@@ -15,7 +15,12 @@ pub struct Variables {
 
 impl Variables {
     pub fn resolve(&mut self, input: &str) -> Result<String> {
-        self.expand(input, &mut BTreeSet::new(), 0)
+        self.expand(input, &mut BTreeSet::new(), 0, false)
+    }
+
+    /// Expand variables while preserving secret references, without retrieving Keychain values.
+    pub fn preview_template(&mut self, input: &str) -> Result<String> {
+        self.expand(input, &mut BTreeSet::new(), 0, true)
     }
 
     fn expand(
@@ -23,6 +28,7 @@ impl Variables {
         input: &str,
         stack: &mut BTreeSet<String>,
         depth: usize,
+        masked: bool,
     ) -> Result<String> {
         if depth > 8 {
             return Err(Error::VariableCycle("maximum depth".to_owned()));
@@ -37,6 +43,11 @@ impl Variables {
                 .ok_or_else(|| Error::InvalidRequest("unclosed variable".to_owned()))?;
             let name = after[..end].trim();
             if let Some(secret_name) = name.strip_prefix("secret:") {
+                if masked {
+                    output.push_str(&format!("{{{{secret:{secret_name}}}}}"));
+                    rest = &after[end + 2..];
+                    continue;
+                }
                 let value = secrets::get(secret_name)?;
                 self.redactor.track(secret_name, &value);
                 output.push_str(&value);
@@ -51,7 +62,7 @@ impl Variables {
                     .or_else(|| self.workspace.get(name))
                     .ok_or_else(|| Error::UnknownVariable(name.to_owned()))?
                     .clone();
-                output.push_str(&self.expand(&value, stack, depth + 1)?);
+                output.push_str(&self.expand(&value, stack, depth + 1, masked)?);
                 stack.remove(name);
             }
             rest = &after[end + 2..];

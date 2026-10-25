@@ -23,7 +23,7 @@ pub use capture::{
 pub use db::{
     ColumnInfo, QueryResultRecord, TableInfo, db_connections, db_describe, db_query, db_tables,
 };
-pub use envs::resolved_env;
+pub use envs::{VariableInfo, resolved_env, variable_catalog};
 pub use error::KestrlError;
 pub use history::{
     EventDetail, EventFilter, EventSummary, HttpExchange, diff_events, list_events, set_note,
