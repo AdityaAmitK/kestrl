@@ -14,6 +14,7 @@ All notable changes are documented here. The format follows [Keep a Changelog](h
 - Browser capture removes abandoned `kestrl-browser-*` temporary profiles when no browser process is using them; device and browser capture lines display full URLs without default HTTP(S) ports.
 
 ### Added
+- macOS app: a custom kestrel app icon for the Dock, Finder and app switcher.
 - macOS request editor: editable method, URL, headers, query params, JSON/text/form bodies and profiles; send without saving, explicit Save/Save As, in-memory drafts, external-edit protection and confirmation before quitting with unsaved edits.
 - macOS workbench: compact pane headers and empty states, searchable request collection, persistent top request bar, syntax-colored response bodies, and on-demand table columns.
 - macOS app: Capture section captures from a browser, a loopback port, an iOS Simulator or an Android emulator. Pick a source and only its controls show; Start and Stop run one capture at a time. Exchanges appear live (newest first), with status, timing, headers, body, Copy JSON, and an opt-in Save to history. Device capture restores the device proxy on Stop, on quit and after an error. Port capture shows its one-time BPF setup command for you to run in Terminal; the app never runs it. Changing workspace stops the capture.
