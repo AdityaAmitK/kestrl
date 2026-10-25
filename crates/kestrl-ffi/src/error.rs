@@ -30,11 +30,14 @@ impl From<kestrl_core::Error> for KestrlError {
             | Error::Write { .. }
             | Error::Read { .. }
             | Error::Toml { .. }
+            | Error::TomlEdit { .. }
             | Error::Io(_) => Self::File { message },
             Error::InvalidRequest(_)
             | Error::UnknownVariable(_)
             | Error::VariableCycle(_)
             | Error::EnvironmentNotFound { .. }
+            | Error::EnvironmentExists { .. }
+            | Error::DefaultEnvironmentInUse { .. }
             | Error::Http(_)
             | Error::ServiceNotRunning { .. }
             | Error::ServiceAlreadyRunning { .. } => Self::Request { message },
@@ -46,7 +49,8 @@ impl From<kestrl_core::Error> for KestrlError {
             | Error::UnsupportedConnectionKind(_)
             | Error::ReadOnlyConnection { .. }
             | Error::InvalidServiceName { .. }
-            | Error::InvalidGrep { .. } => Self::InvalidInput { message },
+            | Error::InvalidGrep { .. }
+            | Error::InvalidName { .. } => Self::InvalidInput { message },
             Error::Capture(_) | Error::Database(_) => Self::Request { message },
             Error::Sqlite(_)
             | Error::Json(_)

@@ -186,6 +186,12 @@ kestrl init [DIR]                        # current directory by default; never o
 kestrl send <file|METHOD URL> [-e env] [-p profile]... [--var k=v]... [--tag t] [--json]
 kestrl run <dir> [-e env] [-p profile]...
 kestrl envs [name]                         # list, or show resolved vars (secrets masked)
+kestrl envs new <name> [--from env]        # create an environment, empty or as a copy
+kestrl envs set <env> KEY=VALUE...         # add or change variables (comments are kept)
+kestrl envs unset <env> KEY...             # remove variables
+kestrl envs rename <from> <to>             # the default follows a rename
+kestrl envs rm <name>                      # not the default environment
+kestrl envs default <name>
 kestrl profiles [name]
 kestrl secret set|rm|ls [name]             # `set` reads the value from stdin or a prompt
 

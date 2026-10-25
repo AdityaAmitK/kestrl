@@ -36,6 +36,24 @@ pub enum Error {
     UnknownVariable(String),
     #[error("environment \"{name}\" not found; available environments: {available}")]
     EnvironmentNotFound { name: String, available: String },
+    /// An environment with this name already exists.
+    #[error("environment \"{name}\" already exists")]
+    EnvironmentExists { name: String },
+    /// The default environment cannot be deleted until another one is the default.
+    #[error(
+        "\"{name}\" is the default environment; make another environment the default before deleting it"
+    )]
+    DefaultEnvironmentInUse { name: String },
+    /// A name for an environment or variable breaks the naming rules.
+    #[error("invalid {kind} name \"{name}\": {rule}")]
+    InvalidName {
+        kind: &'static str,
+        name: String,
+        rule: &'static str,
+    },
+    /// A TOML file could not be parsed for editing.
+    #[error("cannot edit {path}: {message}")]
+    TomlEdit { path: PathBuf, message: String },
     #[error("secret \"{name}\" is not set — run: kestrl secret set {name}")]
     SecretNotSet { name: String },
     #[error("variable expansion cycle or depth limit at {0}")]

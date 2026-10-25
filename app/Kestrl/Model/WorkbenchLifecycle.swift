@@ -7,12 +7,18 @@ final class WorkbenchLifecycle: NSObject, NSApplicationDelegate {
     weak var capture: CaptureStore?
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        if store?.hasUnsavedDrafts == true {
+        let hasRequestDrafts = store?.hasUnsavedDrafts == true
+        let hasEnvironmentEdits = store?.environmentEditor.hasChanges == true
+        if hasRequestDrafts || hasEnvironmentEdits {
             let alert = NSAlert()
-            alert.messageText = "Quit with unsaved requests?"
-            alert.informativeText = "Request drafts are kept in memory. Save the request files before quitting to keep your edits."
+            alert.messageText = "Quit with unsaved changes?"
+            alert.informativeText = switch (hasRequestDrafts, hasEnvironmentEdits) {
+            case (true, true): "You have unsaved request drafts and environment edits. They are lost if you quit."
+            case (true, false): "Request drafts are kept in memory. Save the request files before quitting to keep your edits."
+            default: "Your environment edits are not saved yet. They are lost if you quit."
+            }
             alert.addButton(withTitle: "Keep working")
-            alert.addButton(withTitle: "Discard drafts and quit")
+            alert.addButton(withTitle: "Discard and quit")
             alert.alertStyle = .warning
             guard alert.runModal() == .alertSecondButtonReturn else { return .terminateCancel }
         }

@@ -14,12 +14,13 @@ final class WorkspaceStore {
     private let defaults: UserDefaults
 
     private(set) var workspace: WorkspaceInfo?
+    /// Draft edits and actions for the Environments section.
+    @ObservationIgnored private(set) lazy var environmentEditor = EnvironmentEditor(store: self)
     private(set) var requestTree: [RequestNode] = []
     private(set) var requestDetail: RequestDetail?
     private(set) var requestBody: PreparedBody?
     private(set) var secrets: [SecretStatus] = []
     private(set) var editorVariables: [VariableInfo] = []
-    private(set) var resolvedVariables: [KeyValue] = []
     private(set) var events: [EventSummary] = []
     private(set) var knownActors: [String] = []
     private(set) var eventDetail: ShownEvent?
@@ -250,7 +251,6 @@ final class WorkspaceStore {
         await loadWorkspace(from: URL(fileURLWithPath: root))
         await refreshEvents()
         await loadSecrets()
-        await loadResolvedVariables()
     }
 
     /// Loads what a section needs when it is chosen.
@@ -264,7 +264,6 @@ final class WorkspaceStore {
             break
         case .environments:
             if inspectedEnvironment == nil { inspectedEnvironment = selectedEnvironment }
-            await loadResolvedVariables()
         case .secrets:
             await loadSecrets()
         case .logs:
@@ -525,16 +524,11 @@ final class WorkspaceStore {
 
     // MARK: Environments and secrets
 
-    func loadResolvedVariables() async {
-        guard let root = workspace?.root, let env = inspectedEnvironment else {
-            resolvedVariables = []
-            return
-        }
-        do {
-            resolvedVariables = try await KestrlBridge.run { try resolvedEnv(workspaceRoot: root, env: env) }
-        } catch {
-            report(error)
-        }
+    /// Re-reads the workspace after an environment file or the default changed, then everything derived from it.
+    func environmentFilesChanged() async {
+        guard let root = workspace?.root else { return }
+        await loadWorkspace(from: URL(fileURLWithPath: root))
+        await loadSecrets()
     }
 
     func loadEditorVariables() async {
