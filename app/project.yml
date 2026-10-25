@@ -30,8 +30,8 @@ targets:
         CFBundleName: Kestrl
         CFBundleDisplayName: Kestrl
         CFBundleIconFile: AppIcon.icns
-        CFBundleShortVersionString: "0.1.1"
-        CFBundleVersion: "2"
+        CFBundleShortVersionString: "0.1.2"
+        CFBundleVersion: "3"
         CFBundlePackageType: APPL
         LSMinimumSystemVersion: "15.0"
         NSHighResolutionCapable: true
