@@ -81,6 +81,7 @@ app/              SwiftUI macOS app; links kestrl-ffi as an XCFramework
 |---|---|
 | Workspace | `open_workspace(path) -> WorkspaceInfo` (root, default env, envs, profiles, requests with method and name, retention settings) |
 | Requests | `send_request_file(root, path, env, profiles, vars)`, `send_ad_hoc(root, method, url, env)` → `SentExchange`; recorded as actor `me`, source `app` |
+| Requests | `send_request_draft(root, draft, env)`, `save_request_draft(root, path, draft)` — unresolved drafts use the shared send path; explicit atomic saves reject external changes |
 | Requests | `read_request_file(root, path)` → `RequestDetail`, the file as written, variables unresolved |
 | History | `list_events(filter)`, `show_event(id)`, `tag_event`, `untag_event`, `set_note`, `diff_events(a, b)` → JSON string |
 | Environments | `resolved_env(root, env)` → `[KeyValue]`, secrets masked |
@@ -223,7 +224,7 @@ The global `--json` option applies to database commands as well.
 3. **Database:** Postgres connections per environment, read-only by default, `db query` and `db tables`. Queries recorded in history.
 4. **Capture:** an HTTPS interception proxy with its own root certificate, device capture (iOS Simulator, Android emulator), browser capture (CDP), and port capture (plain HTTP on loopback). The interception proxy binds to loopback only. The system proxy must be restored on exit, and again on the next start after a crash; restore retries retain state until every saved service is restored. Device capture commands are `kestrl capture sim|android [--port] [--save] [--host]`; browser capture launches a separate Chromium-family browser with an isolated temporary profile.
 5. **GUI:** `kestrl-ffi` and the SwiftUI app: request editor, environment picker, history and timeline, log viewer, DB console, live capture, Copy JSON everywhere.
-   The macOS app uses compact pane headers, a searchable collection, a pinned request bar, syntax-colored bodies and on-demand database columns. It keeps list columns at 200–340 pt (240 pt initially). Logs scroll horizontally by default; View ▸ Wrap log lines (⌥⌘W) enables wrapping. JSON objects with `level` and `message` show a level chip, message and remaining fields; Copy preserves the raw line.
+   The request editor supports method, URL, headers, params, body and profiles. Drafts survive row navigation in memory; Save/Save As writes request files, external edits are protected, and quitting with unsaved drafts requires confirmation. The macOS app uses compact pane headers, a searchable collection, a pinned request bar, syntax-colored bodies and on-demand database columns. It keeps list columns at 200–340 pt (240 pt initially). Logs scroll horizontally by default; View ▸ Wrap log lines (⌥⌘W) enables wrapping. JSON objects with `level` and `message` show a level chip, message and remaining fields; Copy preserves the raw line.
 6. **Types (later):** schema inference from history, OpenAPI and JSON Schema import, validation, drift detection, type export.
 
 **Later:** Postman collection import, physical-device capture over Wi-Fi.

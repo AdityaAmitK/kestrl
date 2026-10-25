@@ -16,18 +16,8 @@ struct RequestsDetailView: View {
         }
     }
 
-    @ViewBuilder private var requestPane: some View {
-        if store.selectedRequest == nil {
-            EmptyPane(
-                "New request",
-                systemImage: "square.and.pencil",
-                description: Text("Enter a URL above and press ⌘↩ to send it. Pick a request on the left to open its file.")
-            )
-        } else if let detail = store.requestDetail {
-            RequestPane(store: store, detail: detail)
-        } else {
-            Color.clear
-        }
+    private var requestPane: some View {
+        RequestPane(store: store)
     }
 
     @ViewBuilder private var responsePane: some View {

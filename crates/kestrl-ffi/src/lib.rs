@@ -23,7 +23,8 @@ pub use history::{
     show_event, tag_event, untag_event,
 };
 pub use requests::{
-    RequestDetail, SentExchange, read_request_file, send_ad_hoc, send_request_file,
+    RequestDetail, SentExchange, read_request_file, save_request_draft, send_ad_hoc,
+    send_request_draft, send_request_file,
 };
 pub use secrets::{SecretStatus, delete_secret, secret_status, set_secret};
 pub use services::{

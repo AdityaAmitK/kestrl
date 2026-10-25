@@ -12,6 +12,18 @@ struct KestrlCommands: Commands {
             .keyboardShortcut("n", modifiers: .command)
             .disabled(store.workspace == nil)
 
+            Button("Save request") {
+                Task { await store.saveRequestDraftAsFile() }
+            }
+            .keyboardShortcut("s", modifiers: .command)
+            .disabled(store.section != .requests || !store.isDraftModified)
+
+            Button("Save request as…") {
+                Task { await store.saveRequestDraftAsFile(asCopy: true) }
+            }
+            .keyboardShortcut("s", modifiers: [.command, .shift])
+            .disabled(store.section != .requests)
+
             Divider()
 
             Button("Open workspace…") {

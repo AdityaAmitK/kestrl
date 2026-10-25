@@ -66,8 +66,25 @@ final class WorkspaceStore {
     var selectedEventIDs: Set<String> = []
     var historyText = ""
     var historyActor: String?
-    var adHocMethod = "GET"
-    var adHocURL = ""
+    private var requestDrafts: [String: RequestEditorDraft] = [:]
+    private var originalDrafts: [String: RequestEditorDraft] = [:]
+    private var draftKey: String { "\(workspace?.root ?? "")|\(selectedRequest ?? "<new>")" }
+    var requestDraft: RequestEditorDraft {
+        get { requestDrafts[draftKey] ?? RequestEditorDraft() }
+        set { requestDrafts[draftKey] = newValue }
+    }
+    var isDraftModified: Bool { requestDraft != (originalDrafts[draftKey] ?? RequestEditorDraft()) }
+    var hasUnsavedDrafts: Bool {
+        requestDrafts.contains { key, draft in draft != (originalDrafts[key] ?? RequestEditorDraft()) }
+    }
+    var adHocMethod: String {
+        get { requestDraft.method }
+        set { requestDraft.method = newValue }
+    }
+    var adHocURL: String {
+        get { requestDraft.url }
+        set { requestDraft.url = newValue }
+    }
     var isShowingOpenPanel = false
     var isShowingComparison = false
     var isSettingSecret = false
@@ -98,7 +115,7 @@ final class WorkspaceStore {
 
     /// Whether ⌘↩ and the Send buttons can send: the open request file, or the ad-hoc URL when none is open.
     var canSendRequest: Bool {
-        section == .requests && (selectedRequest != nil ? workspace != nil && !isSending : canSendAdHoc)
+        section == .requests && canSendAdHoc
     }
 
     var hasShownExchange: Bool {
@@ -224,55 +241,106 @@ final class WorkspaceStore {
             let detail = try await KestrlBridge.run { try readRequestFile(workspaceRoot: root, path: path) }
             guard selectedRequest == path else { return }
             requestDetail = detail
+            let loaded = RequestEditorDraft(detail)
+            if requestDrafts[draftKey] == nil { requestDraft = loaded }
+            originalDrafts[draftKey] = loaded
             requestBody = await prepareOptional(detail.body)
         } catch {
             report(error)
         }
     }
 
-    func sendSelectedRequest() async {
-        guard let root = workspace?.root, let path = selectedRequest else { return }
-        let env = selectedEnvironment
-        await perform(requestPath: path) {
-            try sendRequestFile(workspaceRoot: root, path: path, env: env, profiles: [], vars: [])
-        }
-    }
-
-    /// Sends the open request file, or the ad-hoc URL when none is open.
+    /// Sends the current draft without writing it to disk.
     func sendCurrentRequest() async {
-        if selectedRequest != nil {
-            await sendSelectedRequest()
-        } else {
-            await sendAdHocRequest()
-        }
+        guard canSendRequest, let root = workspace?.root else { return }
+        do {
+            let draft = try requestDraft.record()
+            let env = selectedEnvironment
+            let path = selectedRequest
+            let reference = isDraftModified ? nil : path
+            await perform(requestPath: path) {
+                try sendRequestDraft(workspaceRoot: root, draft: draft, env: env, requestPath: reference)
+            }
+        } catch { report(error) }
     }
 
-    /// Opens an empty ad-hoc bar in the Requests section.
+    /// Returns to the unsaved draft. Existing edits are preserved when navigating away.
     func newRequest() {
         section = .requests
         selectedRequest = nil
-        adHocURL = ""
         response = nil
     }
 
-    func sendAdHocRequest() async {
-        guard canSendAdHoc, let root = workspace?.root else { return }
-        let method = adHocMethod
-        let url = adHocURL.trimmingCharacters(in: .whitespaces)
-        let env = selectedEnvironment
-        await perform(requestPath: nil) {
-            try sendAdHoc(workspaceRoot: root, method: method, url: url, env: env)
+    func sendAdHocRequest() async { await sendCurrentRequest() }
+
+    func discardRequestDraft() async {
+        errorMessage = nil
+        requestDrafts.removeValue(forKey: draftKey)
+        if selectedRequest != nil { await requestSelectionChanged() }
+    }
+
+    /// Save only on explicit action, refusing external edits through the core binding.
+    func saveRequestDraftAsFile(asCopy: Bool = false) async {
+        guard let root = workspace?.root else { return }
+        let editingKey = draftKey
+        let snapshot = requestDraft
+        var path = asCopy ? nil : selectedRequest
+        var draft = snapshot
+        if path == nil {
+            let panel = NSSavePanel()
+            panel.title = "Save request"
+            panel.nameFieldStringValue = "request.req.toml"
+            panel.directoryURL = URL(fileURLWithPath: root)
+            panel.canCreateDirectories = true
+            guard await panel.begin() == .OK, let url = panel.url else { return }
+            let prefix = URL(fileURLWithPath: root).standardizedFileURL.path + "/"
+            guard url.standardizedFileURL.path.hasPrefix(prefix) else {
+                report(KestrlError.InvalidInput(message: "Choose a file inside this workspace."))
+                return
+            }
+            path = String(url.standardizedFileURL.path.dropFirst(prefix.count))
+            draft.sourceText = ""
         }
+        guard let path else { return }
+        do {
+            let record = try draft.record()
+            let saved = try await KestrlBridge.run { try saveRequestDraft(workspaceRoot: root, path: path, draft: record) }
+            // Saving a request must not resolve unrelated environment secrets or refresh other panes.
+            await loadWorkspace(from: URL(fileURLWithPath: root))
+            guard workspace?.root == root else { return }
+            let shouldSelect = draftKey == editingKey && requestDraft == snapshot
+            let savedKey = "\(root)|\(path)"
+            let loaded = RequestEditorDraft(saved)
+            if let latest = requestDrafts[editingKey], latest != snapshot, editingKey == savedKey {
+                var updated = latest
+                updated.sourceText = saved.sourceText
+                requestDrafts[savedKey] = updated
+            } else {
+                requestDrafts[savedKey] = loaded
+                if editingKey != savedKey, requestDrafts[editingKey] == snapshot {
+                    requestDrafts.removeValue(forKey: editingKey)
+                }
+            }
+            originalDrafts[savedKey] = loaded
+            if shouldSelect {
+                selectedRequest = path
+                requestDetail = saved
+            }
+        } catch { report(error) }
     }
 
     private func perform(requestPath: String?, _ work: @escaping @Sendable () throws -> SentExchange) async {
         guard !isSending else { return }
+        let selectionKey = draftKey
+        let snapshot = requestDraft
         isSending = true
         defer { isSending = false }
         do {
             let exchange = try await KestrlBridge.run(work)
             let body = await PreparedBody.prepare(exchange.body)
-            response = ShownResponse(requestPath: requestPath, exchange: exchange, body: body)
+            if draftKey == selectionKey, requestDraft == snapshot {
+                response = ShownResponse(requestPath: requestPath, exchange: exchange, body: body)
+            }
             await refreshEvents()
         } catch {
             report(error)

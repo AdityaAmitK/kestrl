@@ -1,45 +1,36 @@
 import SwiftUI
 
-/// The top bar of the Requests section. With a request file open it shows that request's URL template; otherwise it is the ad-hoc bar.
+/// Pinned address bar and explicit draft saving; templates stay unresolved in the editor.
 struct RequestBar: View {
     @Bindable var store: WorkspaceStore
+    @State private var confirmingDiscard = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            if store.selectedRequest == nil {
-                AdHocBar(store: store)
-            } else if let detail = store.requestDetail {
-                HStack(spacing: 12) {
-                    MethodBadge(method: detail.method)
-                    Text(detail.url)
-                        .font(.body.monospaced())
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    SendButton(store: store)
+        VStack(alignment: .leading, spacing: 8) {
+            AdHocBar(store: store)
+            HStack(spacing: 6) {
+                Image(systemName: store.selectedRequest == nil ? "square.and.pencil" : "doc.text")
+                Text(store.selectedRequest ?? "Unsaved request")
+                    .lineLimit(1).truncationMode(.middle)
+                if store.isDraftModified { Text("•").help("Unsaved changes") }
+                Spacer()
+                if store.isDraftModified {
+                    Button { confirmingDiscard = true } label: { Image(systemName: "arrow.counterclockwise") }
+                        .help("Discard draft changes")
+                        .accessibilityLabel("Discard draft changes")
                 }
-            } else {
-                ProgressView()
-                    .controlSize(.small)
-                    .frame(maxWidth: .infinity, minHeight: 28, alignment: .leading)
+                Button("Save", systemImage: "square.and.arrow.down") {
+                    Task { await store.saveRequestDraftAsFile() }
+                }
+                .disabled(!store.isDraftModified || store.isSending)
+                .help("Save the request file (⌘S)")
             }
-
-            Text(environmentHint)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            .font(.system(size: 11)).foregroundStyle(.secondary).controlSize(.small)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 12).padding(.vertical, 10)
         .background(.bar)
-    }
-
-    private var environmentHint: String {
-        var hint = "Environment: \(store.selectedEnvironment ?? "none")"
-        if let profiles = store.requestDetail?.profiles, !profiles.isEmpty {
-            hint += " · Profiles: \(profiles.joined(separator: ", "))"
+        .confirmationDialog("Discard unsaved request changes?", isPresented: $confirmingDiscard) {
+            Button("Discard changes", role: .destructive) { Task { await store.discardRequestDraft() } }
         }
-        return hint
     }
 }
