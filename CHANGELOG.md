@@ -4,6 +4,8 @@ All notable changes are documented here. The format follows [Keep a Changelog](h
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-10-26
+
 ### Added
 - `kestrl send` takes headers and a body on the command line, so it replaces `curl` for authenticated and JSON calls: `-H 'Name: value'` (repeatable, overrides request and profile headers, case-insensitive), `-d/--data` and `--json-body` (`@path` or `@-` for stdin; `--json-body` sets `Content-Type` and `Accept`). Header and body values resolve variables and secrets.
 - `{{env:NAME}}` fills a value from the process environment and masks it in output and history like a secret: `TOKEN="$(cat token-file)" kestrl send GET <url> -H 'Authorization: Bearer {{env:TOKEN}}'`.
