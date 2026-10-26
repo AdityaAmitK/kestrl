@@ -57,12 +57,13 @@ fn forward<R: Read + Send + 'static>(
     })
 }
 
-fn supervise(name: &str, cmd: &[String]) -> Result<i32> {
+fn supervise(name: &str, cmd: &[String], stdin: Stdio) -> Result<i32> {
     let run_directory = registry::dir()?;
     std::fs::create_dir_all(&run_directory)?;
     let mut command = Command::new(&cmd[0]);
     command
         .args(&cmd[1..])
+        .stdin(stdin)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
     #[cfg(unix)]
@@ -146,6 +147,16 @@ fn supervise(name: &str, cmd: &[String]) -> Result<i32> {
 
 /// Start a service and supervise its process and live logs until it exits.
 pub fn run(name: &str, cmd: &[String]) -> Result<i32> {
+    start(name, cmd, Stdio::inherit())
+}
+
+/// Supervise a log follower. Its stdin is an open pipe that is never written, so a remote
+/// follower can tell when the supervisor, and with it the SSH session, has gone.
+pub(crate) fn run_attached(name: &str, cmd: &[String]) -> Result<i32> {
+    start(name, cmd, Stdio::piped())
+}
+
+fn start(name: &str, cmd: &[String], stdin: Stdio) -> Result<i32> {
     if cmd.is_empty() || name.is_empty() || name.contains('/') {
         return Err(Error::InvalidServiceName {
             name: name.to_owned(),
@@ -166,7 +177,7 @@ pub fn run(name: &str, cmd: &[String]) -> Result<i32> {
             registry::remove(&service.name);
         }
     }
-    let result = supervise(name, cmd);
+    let result = supervise(name, cmd, stdin);
     registry::remove(name);
     result
 }

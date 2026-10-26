@@ -9,6 +9,7 @@ use clap::ArgGroup;
 use clap::Args;
 use clap::Subcommand;
 use kestrl_core::duration::parse_since;
+use kestrl_core::services::attach::{self, AttachOptions, AttachSource};
 use kestrl_core::services::buffer::{LogLine, Stream};
 use kestrl_core::services::client::{self, Query};
 
@@ -38,13 +39,13 @@ pub struct LogsArgs {
 
 #[derive(Debug, Subcommand)]
 pub enum LogsAction {
-    /// Attach to a log file or Docker container
+    /// Follow a log file, Docker container or systemd journal, here or over SSH
     Attach(AttachArgs),
 }
 
 /// Arguments for `kestrl logs attach`.
 #[derive(Debug, Args)]
-#[command(group(ArgGroup::new("source").required(true).multiple(false).args(["file", "docker"])))]
+#[command(group(ArgGroup::new("source").required(true).multiple(false).args(["file", "docker", "journal"])))]
 pub struct AttachArgs {
     /// Service name
     pub service: String,
@@ -54,47 +55,41 @@ pub struct AttachArgs {
     /// Follow Docker container logs
     #[arg(long)]
     pub docker: Option<String>,
+    /// Follow a systemd unit's journal
+    #[arg(long, value_name = "UNIT")]
+    pub journal: Option<String>,
+    /// Follow on this SSH host instead (a ~/.ssh/config alias or user@host); read-only, never prompts
+    #[arg(long, value_name = "HOST")]
+    pub ssh: Option<String>,
 }
 
-enum AttachSource {
-    File(PathBuf),
-    Docker(String),
-}
-
-impl TryFrom<AttachArgs> for (String, AttachSource) {
+impl TryFrom<AttachArgs> for AttachOptions {
     type Error = anyhow::Error;
 
     fn try_from(args: AttachArgs) -> Result<Self, Self::Error> {
-        let source = match (args.file, args.docker) {
-            (Some(path), None) => AttachSource::File(path),
-            (None, Some(container)) => AttachSource::Docker(container),
-            _ => bail!("choose exactly one of --file or --docker"),
+        let source = match (args.file, args.docker, args.journal) {
+            (Some(path), None, None) => AttachSource::File(
+                path.into_os_string()
+                    .into_string()
+                    .map_err(|_| anyhow::anyhow!("log file path is not valid UTF-8"))?,
+            ),
+            (None, Some(container), None) => AttachSource::Docker(container),
+            (None, None, Some(unit)) => AttachSource::Journal(unit),
+            _ => bail!("choose exactly one of --file, --docker or --journal"),
         };
-        Ok((args.service, source))
+        Ok(AttachOptions {
+            source,
+            ssh: args.ssh,
+        })
     }
 }
 
 /// Tail a service's live buffer or attach to an external log source.
 pub fn run(context: &Context, args: LogsArgs) -> anyhow::Result<()> {
     if let Some(LogsAction::Attach(arguments)) = args.action {
-        let (service, source) = arguments.try_into()?;
-        let command = match source {
-            AttachSource::File(path) => vec![
-                "tail".into(),
-                "-F".into(),
-                path.into_os_string()
-                    .into_string()
-                    .map_err(|_| anyhow::anyhow!("log file path is not valid UTF-8"))?,
-            ],
-            AttachSource::Docker(container) => vec![
-                "docker".into(),
-                "logs".into(),
-                "-f".into(),
-                "--timestamps=false".into(),
-                container,
-            ],
-        };
-        kestrl_core::services::supervisor::run(&service, &command)?;
+        let service = arguments.service.clone();
+        let options = AttachOptions::try_from(arguments)?;
+        attach::run(&service, &options)?;
         return Ok(());
     }
 
