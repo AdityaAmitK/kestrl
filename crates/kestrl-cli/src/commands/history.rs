@@ -189,6 +189,7 @@ fn replay(ctx: &Context, history: &History, id: &str) -> anyhow::Result<Sent> {
             ctx,
             &[path.display().to_string()],
             &resolve,
+            &send::ContentArgs::default(),
             &client,
             Some(&original),
         )

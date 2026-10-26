@@ -29,12 +29,17 @@ kestrl envs set local api_url=http://localhost:4000   # only when the user asks 
 kestrl envs new staging --from local          # duplicate an environment
 kestrl send requests/auth/login.req.toml -e local
 kestrl send GET '{{api_url}}/users' -e local  # ad hoc, variables still resolve
+kestrl send POST '{{api_url}}/users' --json-body '{"name": "Ada"}' -H 'X-Tenant: acme'
+kestrl send POST https://api.example.com/upload -d @payload.txt   # @path or @- (stdin)
+TOKEN="$(cat ~/.config/example/token)" kestrl send GET https://api.example.com/me -H 'Authorization: Bearer {{env:TOKEN}}'
 kestrl send requests/admin/stats.req.toml -p admin --var user_id=42
 kestrl send requests/users/list.req.toml --tag login-bug
 kestrl run requests/users -e local            # every request in a folder, in order
 ```
 
 `send` JSON: `{ id, status, ms, headers, body, redacted, error }`. `id` is the history event id.
+
+`kestrl send` works outside a workspace too, so use it instead of `curl` for any API call. `-H` overrides request and profile headers; `--json-body` sets `Content-Type`/`Accept` (the global `--json` only changes output). To use a token kept in a file, pass it through that one command's environment and reference it as `{{env:NAME}}`: it is masked in output and history and never appears in the process arguments. Fall back to `curl` only for what `kestrl send` cannot do (file downloads, streaming, multipart uploads), and say why.
 
 Request files are plain TOML (`*.req.toml`): `method`, `url`, optional `profiles`, `[headers]`, `[query]`, `[body] type = "json"|"text"|"form"`. Environments are `.kestrl/envs/<env>.toml` with `[vars]`. Profiles (`.kestrl/profiles/<name>.toml`) add headers or query params, explicitly with `-p` or automatically via a `[when]` block. Precedence: `--var` > collection folder (`folder.toml` next to the request, nearest first) > environment > workspace; profiles override the request file's own headers and query. A folder's `default_env` is used when you don't pass `-e`.
 

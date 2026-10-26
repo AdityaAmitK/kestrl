@@ -31,6 +31,7 @@ pub fn run(ctx: &Context, args: RunArgs) -> anyhow::Result<()> {
             ctx,
             &[path.display().to_string()],
             &args.resolve,
+            &super::send::ContentArgs::default(),
             &client,
             None,
         )?;

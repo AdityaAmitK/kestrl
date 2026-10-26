@@ -1,4 +1,6 @@
 //! Variable and secret interpolation with workspace, environment, and CLI precedence.
+//! `{{secret:name}}` reads a stored secret and `{{env:NAME}}` a process environment variable;
+//! both values are masked in output and history.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -53,6 +55,16 @@ impl Variables {
                 }
                 let value = secrets::get(secret_name)?;
                 self.redactor.track(secret_name, &value);
+                output.push_str(&value);
+            } else if let Some(variable) = name.strip_prefix("env:") {
+                if masked {
+                    output.push_str(&format!("{{{{env:{variable}}}}}"));
+                    rest = &after[end + 2..];
+                    continue;
+                }
+                let value = std::env::var(variable)
+                    .map_err(|_| Error::EnvironmentVariableNotSet(variable.to_owned()))?;
+                self.redactor.track(name, &value);
                 output.push_str(&value);
             } else {
                 if !stack.insert(name.to_owned()) {

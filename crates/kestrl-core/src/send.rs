@@ -41,6 +41,10 @@ pub struct SendOptions {
     pub vars: BTreeMap<String, String>,
     /// Id of the event this send repeats, for replay
     pub correlation: Option<String>,
+    /// Headers that override the request's and its profiles' (`-H`); names match ignoring case
+    pub headers: BTreeMap<String, String>,
+    /// Replaces the request body (`--data`, `--json`)
+    pub body: Option<request::Body>,
 }
 
 /// An exchange and the history event recorded for it.
@@ -67,6 +71,10 @@ pub fn send(root: &Path, target: Target, options: &SendOptions, client: &Client)
         Target::File(path) => (Some(request_ref(root, &path)?), request::load(&path)?),
         Target::AdHoc { method, url } => (None, request::ad_hoc(&method, &url)),
     };
+    let mut request_file = request_file;
+    if let Some(body) = options.body.clone() {
+        request_file.body = Some(body);
+    }
     // A request inside the workspace picks up its collection folders' settings.
     let collection_request = request_ref
         .as_deref()
@@ -98,6 +106,7 @@ pub fn send(root: &Path, target: Target, options: &SendOptions, client: &Client)
         &config,
         &env_name,
         &options.profiles,
+        &options.headers,
         vars,
     )?;
     let exchange = http::send(client, resolved)?;

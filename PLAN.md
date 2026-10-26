@@ -167,7 +167,7 @@ allow_writes = ["local"]      # read-only everywhere else
 url = "postgres://{{secret:db_local_user}}:{{secret:db_local_pass}}@localhost:5432/app"
 ```
 
-**Resolution order:** `--var k=v` > collection folder variables (nearest folder first; environment-specific before general) > environment > workspace config. The environment is `-e`, else the nearest folder's `default_env`, else the workspace default. Request-file headers and query params are the base values; profiles override them in this order: those listed in the request file, then `-p` flags, then profiles whose `when` matches. Later values override earlier ones. Secrets resolve last.
+**Resolution order:** `--var k=v` > collection folder variables (nearest folder first; environment-specific before general) > environment > workspace config. The environment is `-e`, else the nearest folder's `default_env`, else the workspace default. Request-file headers and query params are the base values; profiles override them in this order: those listed in the request file, then `-p` flags, then profiles whose `when` matches, then `-H` flags (header names match ignoring case). Later values override earlier ones. `-d` or `--json-body` replaces the body; `@path` reads a file and `@-` stdin, and `--json-body` sets `Content-Type` and `Accept` to `application/json` unless `-H` sets them. Secrets resolve last. `{{env:NAME}}` reads a process environment variable and is masked like a secret, so a token can reach one command through its environment instead of its arguments.
 
 ## Retention
 
@@ -201,7 +201,7 @@ The source of truth is `crates/kestrl-core/migrations/`.
 kestrl init [DIR]                        # current directory by default; never overwrite
 
 # Requests
-kestrl send <file|METHOD URL> [-e env] [-p profile]... [--var k=v]... [--tag t] [--json]
+kestrl send <file|METHOD URL> [-e env] [-p profile]... [--var k=v]... [-H "Name: value"]... [-d body | --json-body json] [--tag t] [--json]
 kestrl run <dir> [-e env] [-p profile]...
 kestrl envs [name]                         # list, or show resolved vars (secrets masked)
 kestrl envs new <name> [--from env]        # create an environment, empty or as a copy

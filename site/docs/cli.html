@@ -38,11 +38,16 @@ kestrl init my-project --json</code></pre>
 -e, --env &lt;ENV&gt;           Environment name
 -p, --profile &lt;PROFILES&gt;  Profile name; repeatable
     --var &lt;VARS&gt;          Variable override, key=value; repeatable
+-H, --header &lt;HEADER&gt;     Header "Name: value"; repeatable, overrides profiles
+-d, --data &lt;BODY&gt;         Text body; @path reads a file, @- reads stdin
+    --json-body &lt;JSON&gt;    JSON body; sets Content-Type and Accept
     --tag &lt;TAG&gt;           Tag to add to the recorded event
     --actor &lt;ACTOR&gt;       Actor recorded for the command
     --json                Force JSON output</code></pre><div class="copy-row"><button class="copy-button" type="button" data-copy>Copy</button></div>
       <pre><code>kestrl send requests/auth/login.req.toml -e local
-kestrl send GET '{{api_url}}/users' -e local --tag auth-check</code></pre><div class="copy-row"><button class="copy-button" type="button" data-copy>Copy</button></div>
+kestrl send GET '{{api_url}}/users' -e local --tag auth-check
+kestrl send POST '{{api_url}}/users' --json-body '{"name": "Ada"}'
+TOKEN="$(cat token-file)" kestrl send GET https://api.example.com/me -H 'Authorization: Bearer {{env:TOKEN}}'</code></pre><p><code>{{env:NAME}}</code> reads an environment variable and masks its value like a secret.</p><div class="copy-row"><button class="copy-button" type="button" data-copy>Copy</button></div>
       <h3><code>run</code> — send a collection</h3><pre><code>kestrl run [OPTIONS] &lt;DIR&gt;
 
 -e, --env &lt;ENV&gt;
