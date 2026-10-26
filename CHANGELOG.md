@@ -4,6 +4,10 @@ All notable changes are documented here. The format follows [Keep a Changelog](h
 
 ## [Unreleased]
 
+### Fixed
+- `kestrl secret ls` lists stored secrets outside a workspace instead of failing.
+- `kestrl share open --public --hostname` reports the share as protected when Cloudflare Access already covers the hostname, since visitors get the Access login either way.
+
 ## [0.1.4] - 2026-10-26
 
 ### Added

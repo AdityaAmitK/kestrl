@@ -284,6 +284,10 @@ fn run(share: &mut Share, config: &std::path::Path, stop: &AtomicBool) -> Result
             route_dns(config, tunnel, hostname)?;
             if share.access == Access::Protected {
                 verify_access(hostname, stop)?;
+            } else if access_client().is_ok_and(|client| probe_access(&client, hostname).is_ok()) {
+                // Cloudflare Access covers the hostname whatever was asked, so report what visitors
+                // actually get.
+                share.access = Access::Protected;
             }
             command.args(["run", tunnel]);
         }
@@ -563,35 +567,50 @@ fn has_address(server: &str, host: &str) -> Option<bool> {
 /// Check, before anything is exposed, that Cloudflare Access sends unauthenticated visitors of
 /// `hostname` to its login page. New DNS records can take a few seconds, so this retries.
 fn verify_access(hostname: &str, stop: &AtomicBool) -> Result<()> {
-    let client = reqwest::blocking::Client::builder()
-        .redirect(reqwest::redirect::Policy::none())
-        .timeout(Duration::from_secs(10))
-        .build()?;
-    let url = format!("https://{hostname}/");
+    let client = access_client()?;
     let mut last = String::new();
     for _ in 0..4 {
         if stop.load(Ordering::SeqCst) {
             break;
         }
-        match client.get(&url).send() {
-            Ok(response) => {
-                let location = response
-                    .headers()
-                    .get(reqwest::header::LOCATION)
-                    .and_then(|value| value.to_str().ok())
-                    .unwrap_or_default();
-                if response.status().is_redirection() && is_access_login(location) {
-                    return Ok(());
-                }
-                last = format!("got HTTP {}", response.status().as_u16());
-            }
-            Err(error) => last = error.to_string(),
+        match probe_access(&client, hostname) {
+            Ok(()) => return Ok(()),
+            Err(seen) => last = seen,
         }
         std::thread::sleep(Duration::from_secs(3));
     }
     Err(Error::Share(format!(
         "{hostname} is not behind Cloudflare Access ({last}); add an Access application for it in Cloudflare Zero Trust, or share with --public"
     )))
+}
+
+fn access_client() -> Result<reqwest::blocking::Client> {
+    Ok(reqwest::blocking::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .timeout(Duration::from_secs(10))
+        .build()?)
+}
+
+/// One unauthenticated request: `Ok` when Cloudflare Access answers with its login redirect,
+/// otherwise what came back instead.
+fn probe_access(
+    client: &reqwest::blocking::Client,
+    hostname: &str,
+) -> std::result::Result<(), String> {
+    let response = client
+        .get(format!("https://{hostname}/"))
+        .send()
+        .map_err(|error| error.to_string())?;
+    let location = response
+        .headers()
+        .get(reqwest::header::LOCATION)
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or_default();
+    if response.status().is_redirection() && is_access_login(location) {
+        Ok(())
+    } else {
+        Err(format!("got HTTP {}", response.status().as_u16()))
+    }
 }
 
 fn is_access_login(location: &str) -> bool {

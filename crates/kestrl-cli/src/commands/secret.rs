@@ -44,8 +44,11 @@ pub fn run(ctx: &Context, args: SecretArgs) -> anyhow::Result<()> {
         }
         SecretAction::Rm { name } => secrets::delete(&name)?,
         SecretAction::Ls => {
-            let root = workspace::find_root(&std::env::current_dir()?)?;
-            let referenced = secrets::referenced_in_workspace(&root)?;
+            // Outside a workspace there are no references; stored secrets are still listed.
+            let referenced = match workspace::find_root(&std::env::current_dir()?) {
+                Ok(root) => secrets::referenced_in_workspace(&root)?,
+                Err(_) => Default::default(),
+            };
             let stored = secrets::stored_names()?;
             let names: std::collections::BTreeSet<&String> = referenced.union(&stored).collect();
             if ctx.is_json {
