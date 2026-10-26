@@ -4,7 +4,11 @@ All notable changes are documented here. The format follows [Keep a Changelog](h
 
 ## [Unreleased]
 
+### Added
+- Linux CLI: static x86_64 and aarch64 release binaries with checksums, and `install.sh` support for Linux. Requests, environments, secrets, history, services and logs, database queries, browser capture (Chromium-family browsers on `PATH`) and Android emulator capture work on Linux; iOS Simulator capture and port capture report that they are supported only on macOS. `kestrl ps` reads listening ports from `/proc` on Linux, so `lsof` is not required.
+
 ### Changed
+- The service run directory is `run/` in the data directory on every platform (unchanged on macOS: `~/Library/Application Support/kestrl/run`).
 - Secrets are stored in `secrets.toml` in Kestrl's data directory (owner-only, `KESTRL_DATA_DIR` overrides the location) instead of the macOS Keychain, so there are no Keychain access prompts and the store works without Apple frameworks. `{{secret:name}}`, masking, `kestrl secret set|rm|ls` and the app's Secrets section are unchanged, and values are still never shown. Existing Keychain items are not migrated or deleted; set the ones you still use again with `kestrl secret set <name>`.
 
 ## [0.1.2] - 2026-10-25

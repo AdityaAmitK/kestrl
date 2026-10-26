@@ -1,4 +1,4 @@
-//! History store: SQLite at `~/Library/Application Support/kestrl/history.db`.
+//! History store: SQLite at `history.db` in the data directory.
 //!
 //! `record` writes events, `query` reads them, `edit` changes saved ones,
 //! `retention` prunes unsaved ones and `session` groups events.

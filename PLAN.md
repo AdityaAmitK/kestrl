@@ -68,7 +68,9 @@ app/              SwiftUI macOS app; links kestrl-ffi as an XCFramework
 ```
 
 - **GUI:** SwiftUI over the Rust core via UniFFI. The core contains no GUI code.
-- **Store:** SQLite at `~/Library/Application Support/kestrl/history.db` in WAL mode, so the app and CLI can use it at the same time. Project files live in the repo under `.kestrl/`.
+- **Platforms:** the CLI runs on macOS and Linux; the app is macOS only. On Linux the release CLI is a static musl binary with vendored OpenSSL. iOS Simulator capture and port capture (BPF on `lo0`) are macOS only and fail with a clear error elsewhere; browser capture finds Chromium-family browsers on `PATH`, and Android emulator capture needs only `adb`. Service ports come from `lsof` on macOS and `/proc` on Linux.
+- **Data directory:** `~/Library/Application Support/kestrl` on macOS, `~/.local/share/kestrl` on Linux; holds history, secrets, the capture CA and the service run directory (`run/`, or `KESTRL_RUN_DIR`).
+- **Store:** SQLite at `history.db` in the data directory in WAL mode, so the app and CLI can use it at the same time. Project files live in the repo under `.kestrl/`.
 - **Secrets:** `secrets.toml` in the data directory (`~/Library/Application Support/kestrl` on macOS, `~/.local/share/kestrl` on Linux, or `KESTRL_DATA_DIR`), written atomically with owner-only permissions. The CLI and app set, remove and list names but never show a value. Filled in only at send time and replaced with `••••••` before anything is printed or stored.
 - **Output:** human-readable on a TTY; JSON when stdout is not a TTY or with `--json`.
 - **Speed:** sync where possible, tokio only around network I/O, rustls, thin-LTO release builds, no daemon.

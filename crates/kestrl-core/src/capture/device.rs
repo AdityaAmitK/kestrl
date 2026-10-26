@@ -40,6 +40,7 @@ struct AndroidRecord {
 
 /// Check, without changing anything, that an iOS Simulator is booted for capture.
 pub fn check_simulator() -> Result<()> {
+    super::require_macos("iOS Simulator capture")?;
     let text = run("xcrun", &["simctl", "list", "devices", "booted"])?;
     if text.contains("(Booted)") {
         return Ok(());
@@ -185,6 +186,7 @@ pub fn restore_android() -> Result<()> {
 
 /// Add the Kestrl root certificate to the booted iOS Simulator.
 pub fn trust_simulator(certificate: &str) -> Result<()> {
+    super::require_macos("iOS Simulator capture")?;
     run(
         "xcrun",
         &["simctl", "keychain", "booted", "add-root-cert", certificate],

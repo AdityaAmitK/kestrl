@@ -118,6 +118,23 @@ fn executable(
             path.display()
         )));
     }
+    installed(requested).ok_or_else(|| {
+        Error::Capture(format!(
+            "no supported Chromium browser found; {SEARCHED}; pass --browser-path <path>"
+        ))
+    })
+}
+
+fn is_wanted(requested: Option<Browser>, kind: &Browser) -> bool {
+    requested.is_none_or(|wanted| std::mem::discriminant(&wanted) == std::mem::discriminant(kind))
+}
+
+#[cfg(target_os = "macos")]
+const SEARCHED: &str = "searched /Applications and ~/Applications";
+
+/// The first installed application bundle, by preference.
+#[cfg(target_os = "macos")]
+fn installed(requested: Option<Browser>) -> Option<(String, PathBuf)> {
     let choices: &[(Browser, &str)] = &[
         (Browser::Chrome, "Google Chrome"),
         (Browser::Arc, "Arc"),
@@ -126,15 +143,11 @@ fn executable(
         (Browser::Chromium, "Chromium"),
         (Browser::Helium, "Helium"),
     ];
-    let selected = choices
+    let home = std::env::var_os("HOME").map(PathBuf::from)?;
+    choices
         .iter()
-        .filter(|(kind, _)| {
-            requested.is_none_or(|wanted| {
-                std::mem::discriminant(&wanted) == std::mem::discriminant(kind)
-            })
-        })
+        .filter(|(kind, _)| is_wanted(requested, kind))
         .find_map(|(_, app)| {
-            let home = std::env::var_os("HOME").map(PathBuf::from)?;
             [PathBuf::from("/Applications"), home.join("Applications")]
                 .into_iter()
                 .map(|directory| directory.join(format!("{app}.app")))
@@ -143,11 +156,33 @@ fn executable(
                         .ok()
                         .map(|binary| ((*app).to_owned(), binary))
                 })
-        });
-    selected.ok_or_else(|| {
-        let home = std::env::var("HOME").unwrap_or_else(|_| "~".to_owned());
-        Error::Capture(format!("no supported Chromium browser found; searched /Applications and {home}/Applications; pass --browser-path <path>"))
-    })
+        })
+}
+
+#[cfg(not(target_os = "macos"))]
+const SEARCHED: &str = "searched PATH";
+
+/// The first browser command on `PATH`, by preference. Arc and Helium have no Linux builds.
+#[cfg(not(target_os = "macos"))]
+fn installed(requested: Option<Browser>) -> Option<(String, PathBuf)> {
+    let choices: &[(Browser, &str)] = &[
+        (Browser::Chrome, "google-chrome"),
+        (Browser::Chrome, "google-chrome-stable"),
+        (Browser::Brave, "brave-browser"),
+        (Browser::Edge, "microsoft-edge"),
+        (Browser::Chromium, "chromium"),
+        (Browser::Chromium, "chromium-browser"),
+    ];
+    let path = std::env::var_os("PATH")?;
+    choices
+        .iter()
+        .filter(|(kind, _)| is_wanted(requested, kind))
+        .find_map(|(_, command)| {
+            std::env::split_paths(&path)
+                .map(|directory| directory.join(command))
+                .find(|binary| binary.is_file())
+                .map(|binary| ((*command).to_owned(), binary))
+        })
 }
 
 fn bundle_executable(bundle: &Path) -> Result<PathBuf> {

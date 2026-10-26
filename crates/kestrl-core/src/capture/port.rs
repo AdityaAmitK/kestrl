@@ -1,5 +1,8 @@
 //! Plain-HTTP capture from a loopback TCP port.
 
+// Packet decoding is only reachable through the macOS BPF reader.
+#![cfg_attr(not(target_os = "macos"), allow(dead_code, unused_imports))]
+
 use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::net::{Ipv4Addr, Ipv6Addr};
 use std::path::Path;
@@ -45,11 +48,24 @@ pub fn run_cancellable(
     cancelled: Arc<AtomicBool>,
 ) -> Result<()> {
     validate_port(port)?;
-    if !cfg!(target_os = "macos") {
-        return Err(Error::Capture(
-            "port capture is supported only on macOS lo0".to_owned(),
-        ));
+    super::require_macos("port capture")?;
+    #[cfg(target_os = "macos")]
+    return capture_loopback(port, hosts, callback, cancelled);
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = (hosts, callback, cancelled);
+        Ok(())
     }
+}
+
+/// Read `lo0` through BPF and reconstruct HTTP exchanges until cancelled.
+#[cfg(target_os = "macos")]
+fn capture_loopback(
+    port: u16,
+    hosts: Vec<String>,
+    callback: Callback,
+    cancelled: Arc<AtomicBool>,
+) -> Result<()> {
     let device = pcap::Capture::from_device("lo0")
         .map_err(capture_error)?
         .promisc(false)
@@ -143,6 +159,9 @@ const UNINSTALL_COMMAND: &str = "sudo sh scripts/kestrl-bpf.sh uninstall --user 
 
 /// Describe the one-time BPF setup without changing system state.
 pub fn setup_status() -> String {
+    if let Err(error) = super::require_macos("port capture") {
+        return error.to_string();
+    }
     format!(
         "Port capture reads loopback packets through macOS BPF devices, which are root-only by default. \
 Run this once from a Kestrl checkout with administrator authorization. Kestrl does not run it for you:\n\n  {SETUP_COMMAND}\n\n\
@@ -155,6 +174,9 @@ Log out and back in after setup. This command does not change system state."
 
 /// Report whether BPF access is available and whether the Kestrl setup is installed.
 pub fn status() -> String {
+    if let Err(error) = super::require_macos("port capture") {
+        return error.to_string();
+    }
     if bpf_accessible() {
         "Port capture status: BPF device access is available to this process.".to_owned()
     } else if setup_installed() {
@@ -169,6 +191,9 @@ pub fn status() -> String {
 
 /// Describe how to remove the Kestrl BPF setup, without changing system state.
 pub fn uninstall() -> Result<String> {
+    if let Err(error) = super::require_macos("port capture") {
+        return Ok(error.to_string());
+    }
     if !setup_installed() {
         return Ok("No Kestrl BPF setup is installed; nothing to remove.".to_owned());
     }
@@ -197,6 +222,7 @@ pub fn setup_installed() -> bool {
     Path::new(HELPER_PATH).exists() || Path::new(LAUNCH_DAEMON_PATH).exists()
 }
 
+#[cfg(target_os = "macos")]
 fn capture_error(error: pcap::Error) -> Error {
     Error::Capture(error.to_string())
 }

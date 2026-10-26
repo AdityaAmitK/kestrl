@@ -8,13 +8,15 @@ Kestrl puts an API client, request history, service logs, a Postgres console and
 
 ## Install
 
-Install the standalone CLI with the shell installer:
+Install the standalone CLI on macOS or Linux (x86_64, aarch64) with the shell installer:
 
 ```sh
 curl -fsSL https://kestrl.adityakinjawadekar.com/install.sh | sh
 ```
 
-Or install the CLI or macOS app with Homebrew:
+On Linux the CLI is a static binary that runs on servers and headless machines. Everything except iOS Simulator capture and port capture works there; those two fail with a clear "supported only on macOS" error. Secrets, history and service logs live under `~/.local/share/kestrl`.
+
+Or install the CLI or macOS app with Homebrew on macOS:
 
 ```sh
 brew install adityaamitk/tap/kestrl
@@ -28,7 +30,7 @@ The app and CLI are ad-hoc signed, not notarized. On first launch, macOS may blo
 
 ## Install from source
 
-Requires Rust (stable) and macOS.
+Requires Rust (stable) on macOS or Linux. The macOS app also needs Xcode and XcodeGen (`scripts/build-app.sh`).
 
 ```sh
 git clone https://github.com/AdityaAmitK/kestrl
