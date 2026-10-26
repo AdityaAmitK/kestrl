@@ -35,6 +35,8 @@ final class WorkspaceStore {
     private(set) var collapsedFolders: Set<String> = []
 
     private(set) var services: [ServiceInfo] = []
+    /// Ports shared through Cloudflare tunnels, opened with `kestrl share open`
+    private(set) var shares: [ShareInfo] = []
     /// The newest `logCapacity` lines of the selected service, oldest first
     private(set) var logLines: [LogLine] = []
     /// Why the stream stopped, when it did
@@ -609,6 +611,17 @@ final class WorkspaceStore {
     func loadServices() async {
         do {
             services = try await KestrlBridge.run { try listServices() }
+            shares = try await KestrlBridge.run { try listShares() }
+        } catch {
+            report(error)
+        }
+    }
+
+    /// Closes a share and waits until its tunnel is gone.
+    func closeShare(id: String) async {
+        do {
+            try await KestrlBridge.run { try Kestrl.closeShare(id: id) }
+            shares = try await KestrlBridge.run { try listShares() }
         } catch {
             report(error)
         }
