@@ -22,6 +22,7 @@ Each term means one thing and is used the same way in code, the CLI and the docs
 | **Capture** | Kestrl observes traffic that something else makes | `kestrl capture …` |
 | **Up** | Start a service through Kestrl so its logs are collected | `kestrl up` |
 | **Attach** | Follow logs of a service Kestrl did not start (file, Docker or systemd journal), on this machine or over SSH | `kestrl logs attach` |
+| **Share** | Expose one local web port at a URL through a Cloudflare tunnel, for a limited time | `kestrl share` |
 | **Tail** | Read or follow a service's logs | `kestrl logs <service>` |
 | **Query** | Run SQL against a database connection | `kestrl db query` |
 | **Browse** | Look through database tables | GUI |
@@ -169,6 +170,12 @@ url = "postgres://{{secret:db_local_user}}:{{secret:db_local_pass}}@localhost:54
 
 **Resolution order:** `--var k=v` > collection folder variables (nearest folder first; environment-specific before general) > environment > workspace config. The environment is `-e`, else the nearest folder's `default_env`, else the workspace default. Request-file headers and query params are the base values; profiles override them in this order: those listed in the request file, then `-p` flags, then profiles whose `when` matches, then `-H` flags (header names match ignoring case). Later values override earlier ones. `-d` or `--json-body` replaces the body; `@path` reads a file and `@-` stdin, and `--json-body` sets `Content-Type` and `Accept` to `application/json` unless `-H` sets them. Secrets resolve last. `{{env:NAME}}` reads a process environment variable and is masked like a secret, so a token can reach one command through its environment instead of its arguments.
 
+## Share
+
+`kestrl share open` exposes one local HTTP or HTTPS port through `cloudflared` and prints the URL; nothing else on the machine is exposed. Access is always explicit: `--public` (anyone with the URL) or `--protected`. Without `--hostname` the URL is a temporary `trycloudflare.com` address, which is always public. With `--hostname` Kestrl routes the name to a named tunnel (`kestrl` by default) with `cloudflared tunnel route dns`, never overwriting an existing record for another target. `--protected` requires a Cloudflare Access application on the hostname: before the tunnel starts, Kestrl checks that an unauthenticated request is redirected to `*.cloudflareaccess.com`, so the app is never reachable without Access. Kestrl never creates Access applications or edits the user's `~/.cloudflared/config.yml`; each share gets its own `cloudflared` configuration in the data directory.
+
+Every share has a lifetime (`--ttl`, default 1h, 1m–24h). A detached owner process per share runs `cloudflared`, records the share in `shares/<id>.json` in the data directory and closes it at expiry or on `kestrl share close` (SIGTERM, so Cloudflare unregisters the connection at once). `open` returns once the URL works: for temporary URLs it waits until Cloudflare's authoritative nameservers answer (asking a caching resolver earlier would cache "no such host"), for named hostnames until the edge stops answering 530. One share per named tunnel at a time. DNS records created for named hostnames stay after close; with no connector they return a Cloudflare error, never the app.
+
 ## Retention
 
 | Data | Kept |
@@ -226,6 +233,12 @@ kestrl up <service> -- <cmd...>
 kestrl ps
 kestrl logs <service> [-f] [--since 2m] [--grep re] [--json]
 kestrl logs attach <service> --file <path> | --docker <container> | --journal <unit> [--ssh <host>]
+
+# Share
+kestrl share open <port> --public|--protected [--hostname <host>] [--tunnel <name>] [--https] [--ttl 1h]
+kestrl share ls
+kestrl share status <id>
+kestrl share close <id> | --all
 
 # Database
 kestrl db query <connection> "<sql>" [-e env]

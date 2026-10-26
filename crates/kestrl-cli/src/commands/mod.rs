@@ -14,6 +14,7 @@ pub mod run;
 pub mod secret;
 pub mod send;
 pub mod session;
+pub mod share;
 pub mod tag;
 pub mod up;
 
@@ -54,6 +55,8 @@ pub enum Command {
     Ps(ps::PsArgs),
     /// Tail or follow a service's live buffer
     Logs(logs::LogsArgs),
+    /// Share a local port through a Cloudflare tunnel for a limited time
+    Share(share::ShareArgs),
 }
 
 /// Flags shared by commands that resolve variables and profiles.
@@ -87,5 +90,6 @@ pub fn dispatch(ctx: &Context, command: Command) -> anyhow::Result<()> {
         Command::Up(args) => up::run(ctx, args),
         Command::Ps(args) => ps::run(ctx, args),
         Command::Logs(args) => logs::run(ctx, args),
+        Command::Share(args) => share::run(ctx, args),
     }
 }

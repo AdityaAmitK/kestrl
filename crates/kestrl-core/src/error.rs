@@ -87,6 +87,9 @@ pub enum Error {
     NoDataDir,
     #[error("capture failed: {0}")]
     Capture(String),
+    /// A share could not be opened, verified or closed.
+    #[error("share failed: {0}")]
+    Share(String),
     #[error("unknown connection \"{0}\"")]
     UnknownConnection(String),
     #[error("connection \"{connection}\" has no entry for env \"{env}\"")]
