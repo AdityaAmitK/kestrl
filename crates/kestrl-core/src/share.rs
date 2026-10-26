@@ -112,6 +112,7 @@ pub fn create(options: &ShareOptions) -> Result<Share> {
     {
         return Err(Error::Share(format!("invalid hostname {hostname:?}")));
     }
+    let mut _reservation = None;
     if let Some(tunnel) = &tunnel {
         if tunnel.is_empty()
             || !tunnel
@@ -120,7 +121,15 @@ pub fn create(options: &ShareOptions) -> Result<Share> {
         {
             return Err(Error::Share(format!("invalid tunnel name {tunnel:?}")));
         }
-        // Every connector of a tunnel gets a share of its traffic, so one share per tunnel.
+        // Every connector of a tunnel gets a share of its traffic, so one share per tunnel. The lock
+        // makes checking and reserving one step, so two concurrent opens cannot both pass.
+        let lock = std::fs::OpenOptions::new()
+            .create(true)
+            .truncate(false)
+            .write(true)
+            .open(dir()?.join("create.lock"))?;
+        lock.lock()?;
+        _reservation = Some(lock);
         if let Some(open) = list()?
             .into_iter()
             .find(|share| share.tunnel.as_ref() == Some(tunnel))
@@ -166,7 +175,7 @@ pub fn list() -> Result<Vec<Share>> {
         let is_stale = if share.pid == 0 {
             now_ms() - share.created_at > duration_ms(START_TIMEOUT)
         } else {
-            !is_alive(share.pid)
+            !is_owner(share.pid, &share.id)
         };
         if is_stale {
             remove(&share.id);
@@ -200,8 +209,11 @@ pub fn close(id: &str) -> Result<()> {
     let deadline = Instant::now() + Duration::from_secs(10);
     while record(id).exists() {
         if Instant::now() >= deadline {
-            // The owner leads its own process group, which includes `cloudflared`.
-            let _ = signal("-KILL", &format!("-{}", share.pid));
+            // The owner leads its own process group, which includes `cloudflared`. Check it is
+            // still this share's owner, so a reused process ID is never signalled.
+            if is_owner(share.pid, id) {
+                let _ = signal("-KILL", &format!("-{}", share.pid));
+            }
             remove(id);
             break;
         }
@@ -270,7 +282,10 @@ fn run(share: &mut Share, config: &std::path::Path, stop: &AtomicBool) -> Result
         share.port
     );
     write_private(config, config_text(share, &origin).as_bytes())?;
-    let mut command = Command::new("cloudflared");
+    // `cloudflared` runs under a shell that stops it when this owner goes away, even if the owner is
+    // killed: the owner holds the shell's stdin open and never writes to it.
+    let mut command = Command::new("sh");
+    command.args(["-c", OWNER_WATCH, "kestrl-share", "cloudflared"]);
     command.args([
         "tunnel",
         "--no-autoupdate",
@@ -284,7 +299,9 @@ fn run(share: &mut Share, config: &std::path::Path, stop: &AtomicBool) -> Result
             route_dns(config, tunnel, hostname)?;
             if share.access == Access::Protected {
                 verify_access(hostname, stop)?;
-            } else if access_client().is_ok_and(|client| probe_access(&client, hostname).is_ok()) {
+            } else if access_client()
+                .is_ok_and(|client| probe_access(&client, hostname, "/").is_ok())
+            {
                 // Cloudflare Access covers the hostname whatever was asked, so report what visitors
                 // actually get.
                 share.access = Access::Protected;
@@ -299,7 +316,7 @@ fn run(share: &mut Share, config: &std::path::Path, stop: &AtomicBool) -> Result
         }
     }
     let mut child = command
-        .stdin(Stdio::null())
+        .stdin(Stdio::piped())
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
         .spawn()
@@ -313,10 +330,15 @@ fn run(share: &mut Share, config: &std::path::Path, stop: &AtomicBool) -> Result
     result
 }
 
+/// Runs `"$@"` (cloudflared) and sends it SIGTERM when stdin closes, that is when the owner stops
+/// or dies. The command's own stdin is /dev/null.
+const OWNER_WATCH: &str = r#"exec 3<&0; "$@" </dev/null & p=$!; (cat <&3 >/dev/null; kill $p 2>/dev/null) >/dev/null 2>&1 & wait $p"#;
+
 /// Ask `cloudflared` to unregister its connections, so Cloudflare stops routing to them at once,
 /// and kill it if it is still running after a few seconds.
 fn stop_gracefully(child: &mut Child) {
-    signal("-TERM", &child.id().to_string());
+    // Closing the watcher's stdin makes it send SIGTERM to cloudflared.
+    drop(child.stdin.take());
     let deadline = Instant::now() + Duration::from_secs(5);
     while Instant::now() < deadline {
         if matches!(child.try_wait(), Ok(Some(_))) {
@@ -324,6 +346,9 @@ fn stop_gracefully(child: &mut Child) {
         }
         std::thread::sleep(POLL);
     }
+    let _ = Command::new("pkill")
+        .args(["-KILL", "-P", &child.id().to_string()])
+        .status();
     let _ = child.kill();
     let _ = child.wait();
 }
@@ -403,14 +428,20 @@ fn keep_open(share: &mut Share, child: &mut Child, stop: &AtomicBool) -> Result<
             .url
             .as_deref()
             .and_then(|url| url.strip_prefix("https://"))
+        && !wait_for_dns(host, stop)
     {
-        wait_for_dns(host, stop);
+        return Err(Error::Share(format!(
+            "{host} did not appear in DNS within 30 s; try again"
+        )));
     }
     if share.hostname.is_some()
         && share.access == Access::Public
         && let Some(url) = &share.url
+        && !wait_until_routed(url, stop)
     {
-        wait_until_routed(url, stop);
+        return Err(Error::Share(format!(
+            "Cloudflare still answers 530 for {url} after 20 s, so the tunnel is not routing; check that no other connector serves the tunnel"
+        )));
     }
     share.state = ShareState::Ready;
     save(share)?;
@@ -468,44 +499,55 @@ fn route_dns(config: &std::path::Path, tunnel: &str, hostname: &str) -> Result<(
 /// name appears there a moment after its connection registers. Asking any caching resolver
 /// before that would make it remember "no such host" for a minute, so only authoritative servers,
 /// which do not cache, are asked.
-fn wait_for_dns(host: &str, stop: &AtomicBool) {
+/// `false` only when the name is confirmed missing for the whole wait; when the nameservers cannot
+/// be asked, the outcome is unknown and treated as ready.
+fn wait_for_dns(host: &str, stop: &AtomicBool) -> bool {
     let Some((_, zone)) = host.split_once('.') else {
-        return;
+        return true;
     };
     let servers = nameservers(zone);
+    if servers.is_empty() {
+        return true;
+    }
     let deadline = Instant::now() + Duration::from_secs(30);
+    let mut was_answered = false;
     while Instant::now() < deadline && !stop.load(Ordering::SeqCst) {
-        if servers
+        let answers: Vec<Option<bool>> = servers
             .iter()
-            .any(|server| has_address(server, host) == Some(true))
-        {
-            return;
+            .map(|server| has_address(server, host))
+            .collect();
+        if answers.contains(&Some(true)) {
+            return true;
         }
+        was_answered |= answers.iter().any(Option::is_some);
         std::thread::sleep(Duration::from_secs(1));
     }
+    stop.load(Ordering::SeqCst) || !was_answered
 }
 
 /// Wait up to 20 s until Cloudflare's edge routes `url` to the new connection instead of answering
 /// 530 (no tunnel), which it does for a few seconds after the connection registers.
-fn wait_until_routed(url: &str, stop: &AtomicBool) {
+/// `false` only when every answer during the wait was 530; when the edge cannot be reached the
+/// outcome is unknown and treated as ready.
+fn wait_until_routed(url: &str, stop: &AtomicBool) -> bool {
     let Ok(client) = reqwest::blocking::Client::builder()
         .redirect(reqwest::redirect::Policy::none())
         .timeout(Duration::from_secs(5))
         .build()
     else {
-        return;
+        return true;
     };
     let deadline = Instant::now() + Duration::from_secs(20);
+    let mut saw_530 = false;
     while Instant::now() < deadline && !stop.load(Ordering::SeqCst) {
-        if client
-            .get(url)
-            .send()
-            .is_ok_and(|response| response.status().as_u16() != 530)
-        {
-            return;
+        match client.get(url).send() {
+            Ok(response) if response.status().as_u16() != 530 => return true,
+            Ok(_) => saw_530 = true,
+            Err(_) => {}
         }
         std::thread::sleep(Duration::from_secs(1));
     }
+    stop.load(Ordering::SeqCst) || !saw_530
 }
 
 /// The nameservers of `zone`, from Cloudflare's DNS over HTTPS. The zone exists, so its answer is
@@ -573,7 +615,15 @@ fn verify_access(hostname: &str, stop: &AtomicBool) -> Result<()> {
         if stop.load(Ordering::SeqCst) {
             break;
         }
-        match probe_access(&client, hostname) {
+        // A path-specific Access application could exempt a sub-path, so check one that cannot be
+        // known in advance as well as the root.
+        let random = format!(
+            "/kestrl-access-check-{}",
+            ulid::Ulid::new().to_string().to_ascii_lowercase()
+        );
+        match probe_access(&client, hostname, "/")
+            .and_then(|()| probe_access(&client, hostname, &random))
+        {
             Ok(()) => return Ok(()),
             Err(seen) => last = seen,
         }
@@ -596,9 +646,10 @@ fn access_client() -> Result<reqwest::blocking::Client> {
 fn probe_access(
     client: &reqwest::blocking::Client,
     hostname: &str,
+    path: &str,
 ) -> std::result::Result<(), String> {
     let response = client
-        .get(format!("https://{hostname}/"))
+        .get(format!("https://{hostname}{path}"))
         .send()
         .map_err(|error| error.to_string())?;
     let location = response
@@ -609,7 +660,10 @@ fn probe_access(
     if response.status().is_redirection() && is_access_login(location) {
         Ok(())
     } else {
-        Err(format!("got HTTP {}", response.status().as_u16()))
+        Err(format!(
+            "got HTTP {} for {path}",
+            response.status().as_u16()
+        ))
     }
 }
 
@@ -642,8 +696,14 @@ fn is_hostname(hostname: &str) -> bool {
         })
 }
 
-fn is_alive(pid: u32) -> bool {
-    signal("-0", &pid.to_string())
+/// Whether `pid` is still the process that owns share `id`, not a later process that reused the ID.
+fn is_owner(pid: u32, id: &str) -> bool {
+    Command::new("ps")
+        .args(["-o", "args=", "-p", &pid.to_string()])
+        .output()
+        .is_ok_and(|output| {
+            String::from_utf8_lossy(&output.stdout).contains(&format!("share serve {id}"))
+        })
 }
 
 fn signal(signal: &str, target: &str) -> bool {

@@ -82,7 +82,7 @@ pub fn send(client: &reqwest::blocking::Client, request: ResolvedRequest) -> Res
     let redact = |value: &str| request.redactor.redact(value);
     Ok(Exchange {
         method: redact(&request.method),
-        url: redact(&final_url),
+        url: request.redactor.redact_url(&final_url),
         request_headers: request
             .headers
             .into_iter()
@@ -96,7 +96,9 @@ pub fn send(client: &reqwest::blocking::Client, request: ResolvedRequest) -> Res
             .collect(),
         response_body: redact(&response_body),
         duration_ms,
-        error: error.as_deref().map(redact),
+        error: error
+            .as_deref()
+            .map(|error| request.redactor.redact_url(error)),
         redacted: names,
     })
 }

@@ -192,12 +192,23 @@ pub fn stop(name: &str) -> Result<()> {
         .ok_or_else(|| Error::ServiceNotRunning {
             name: name.to_owned(),
         })?;
+    // Only a live supervisor answers on its socket. Without one the entry is stale and its process
+    // ID may belong to an unrelated process by now, so nothing is signalled.
+    let socket = registry::dir()?.join(format!("{name}.sock"));
+    if UnixStream::connect(&socket).is_err() {
+        registry::remove(name);
+        return Err(Error::ServiceNotRunning {
+            name: name.to_owned(),
+        });
+    }
     let group = format!("-{}", service.pid);
     let _ = Command::new("kill").args(["-TERM", "--", &group]).status();
     let deadline = std::time::Instant::now() + Duration::from_secs(10);
     while registry::list()?.iter().any(|service| service.name == name) {
         if std::time::Instant::now() >= deadline {
-            let _ = Command::new("kill").args(["-KILL", "--", &group]).status();
+            if UnixStream::connect(&socket).is_ok() {
+                let _ = Command::new("kill").args(["-KILL", "--", &group]).status();
+            }
             registry::remove(name);
             break;
         }

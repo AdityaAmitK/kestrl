@@ -180,6 +180,10 @@ fn replay(ctx: &Context, history: &History, id: &str) -> anyhow::Result<Sent> {
             )
         })?;
         let path = PathBuf::from(detail.workspace.unwrap_or_default()).join(request_ref);
+        crate::commands::output::warn(&format!(
+            "{original} used secrets, so it is re-sent from {} as the file is now; profiles, --var, -H and body given on the original command line are not included",
+            path.display()
+        ));
         let resolve = ResolveArgs {
             env: detail.event.env,
             profiles: Vec::new(),

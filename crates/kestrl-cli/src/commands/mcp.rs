@@ -203,16 +203,16 @@ fn command(name: &str, arguments: &Value) -> anyhow::Result<Run> {
                 &required(arguments, "url")?,
             ]);
             for header in arguments["headers"].as_array().into_iter().flatten() {
-                push(&["-H", header.as_str().unwrap_or_default()]);
+                push(&[&format!("--header={}", header.as_str().unwrap_or_default())]);
             }
-            optional(&mut push, arguments, "body", "-d");
+            optional(&mut push, arguments, "body", "--data");
             optional(&mut push, arguments, "json_body", "--json-body");
-            optional(&mut push, arguments, "env", "-e");
+            optional(&mut push, arguments, "env", "--env");
         }
         "history" => {
             push(&["history"]);
             if let Some(query) = text(arguments, "query") {
-                push(&[&query]);
+                push(&[&positional("query", query)?]);
             }
             optional(&mut push, arguments, "since", "--since");
             push(&[
@@ -240,7 +240,7 @@ fn command(name: &str, arguments: &Value) -> anyhow::Result<Run> {
             let [(kind, value)] = sources.as_slice() else {
                 bail!("give exactly one of file, docker or journal");
             };
-            push(&[&format!("--{kind}"), value]);
+            push(&[&format!("--{kind}={value}")]);
             optional(&mut push, arguments, "ssh", "--ssh");
             return Ok(Run::Detach {
                 args,
@@ -281,13 +281,26 @@ fn number(arguments: &Value, key: &str) -> Option<u64> {
     arguments[key].as_u64()
 }
 
+/// A required value. Every required value is a positional argument, so it may not look like a flag.
 fn required(arguments: &Value, key: &str) -> anyhow::Result<String> {
-    text(arguments, key).with_context(|| format!("{key} is required"))
+    positional(
+        key,
+        text(arguments, key).with_context(|| format!("{key} is required"))?,
+    )
+}
+
+/// Refuse a positional value that the CLI would read as a flag, such as an id of `--all`.
+fn positional(key: &str, value: String) -> anyhow::Result<String> {
+    if value.starts_with('-') {
+        bail!("{key} must not start with '-'");
+    }
+    Ok(value)
 }
 
 fn optional(push: &mut impl FnMut(&[&str]), arguments: &Value, key: &str, flag: &str) {
+    // One `--flag=value` argument, so a value starting with '-' is never read as another flag.
     if let Some(value) = text(arguments, key) {
-        push(&[flag, &value]);
+        push(&[&format!("{flag}={value}")]);
     }
 }
 

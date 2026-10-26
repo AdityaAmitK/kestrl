@@ -5,6 +5,17 @@ All notable changes are documented here. The format follows [Keep a Changelog](h
 ## [Unreleased]
 
 ### Fixed
+- Secrets used in a URL or query are masked in their percent- and form-encoded forms too, so they no longer reach history encoded.
+- A share's `cloudflared` stops when its owner process dies, even if the owner is killed; it no longer outlives a crashed share.
+- `--protected` also checks a random path, so a path-specific Access exemption is caught before anything is exposed.
+- Two simultaneous `share open` calls can no longer both claim one named tunnel.
+- `kestrl stop` and `share close` never signal a process that only reuses a stale ID.
+- `kestrl mcp` passes values as `--flag=value` and refuses positional values that look like flags (a share id of `--all` no longer closes every share).
+- With repeated `-H` for one header in different letter case, the last one wins.
+- `history replay` warns when it re-sends from the request file, because command-line profiles, `--var`, `-H` and body are not included.
+- `share open` fails instead of reporting ready when the URL is confirmed not to resolve or the edge keeps answering 530.
+
+### Fixed
 - `kestrl secret ls` lists stored secrets outside a workspace instead of failing.
 - `kestrl share open --public --hostname` reports the share as protected when Cloudflare Access already covers the hostname, since visitors get the Access login either way.
 

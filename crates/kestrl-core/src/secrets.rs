@@ -160,9 +160,18 @@ pub struct Redactor {
 }
 
 impl Redactor {
+    /// Mask `value` as it is and as it appears percent-encoded or form-encoded, so a secret in a
+    /// query string or form body is masked too.
     pub fn track(&mut self, name: &str, value: &str) {
-        if !value.is_empty() {
-            self.values.push((name.to_owned(), value.to_owned()));
+        if value.is_empty() {
+            return;
+        }
+        let encoded = urlencoding::encode(value).into_owned();
+        let form = encoded.replace("%20", "+");
+        for variant in [value.to_owned(), encoded, form] {
+            if !self.values.iter().any(|(_, known)| *known == variant) {
+                self.values.push((name.to_owned(), variant));
+            }
         }
     }
 
@@ -172,7 +181,32 @@ impl Redactor {
             .fold(text.to_owned(), |acc, (_, v)| acc.replace(v, MASK))
     }
 
+    /// Mask a URL or a message containing one. The URL parser encodes only some characters, so a
+    /// secret can survive in a form that matches none of the tracked variants; when the decoded
+    /// text still contains one, the decoded text is masked instead.
+    pub fn redact_url(&self, text: &str) -> String {
+        let redacted = self.redact(text);
+        match urlencoding::decode(&redacted) {
+            Ok(decoded)
+                if self
+                    .values
+                    .iter()
+                    .any(|(_, value)| decoded.contains(value.as_str())) =>
+            {
+                self.redact(&decoded)
+            }
+            _ => redacted,
+        }
+    }
+
+    /// The masked names, each once, in the order they were first tracked.
     pub fn names(&self) -> Vec<&str> {
-        self.values.iter().map(|(n, _)| n.as_str()).collect()
+        let mut names: Vec<&str> = Vec::new();
+        for (name, _) in &self.values {
+            if !names.contains(&name.as_str()) {
+                names.push(name);
+            }
+        }
+        names
     }
 }
