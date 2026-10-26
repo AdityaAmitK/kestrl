@@ -1,4 +1,4 @@
-//! Keychain secrets for the app. Values go in and never come back out.
+//! Secrets for the app. Values go in and never come back out.
 
 use std::path::Path;
 
@@ -6,17 +6,17 @@ use kestrl_core::secrets;
 
 use crate::error::KestrlError;
 
-/// A secret the workspace refers to or the Keychain holds.
+/// A secret the workspace refers to or the secrets file holds.
 #[derive(Debug, uniffi::Record)]
 pub struct SecretStatus {
     pub name: String,
-    /// The Keychain holds a value.
+    /// A value is stored.
     pub is_set: bool,
     /// A workspace file uses it as `{{secret:name}}`.
     pub is_referenced: bool,
 }
 
-/// Store a secret in the Keychain, replacing any previous value.
+/// Store a secret, replacing any previous value.
 #[uniffi::export]
 pub fn set_secret(name: String, value: String) -> Result<(), KestrlError> {
     if value.is_empty() {
@@ -28,7 +28,7 @@ pub fn set_secret(name: String, value: String) -> Result<(), KestrlError> {
     Ok(())
 }
 
-/// Remove a secret from the Keychain.
+/// Remove a stored secret.
 #[uniffi::export]
 pub fn delete_secret(name: String) -> Result<(), KestrlError> {
     secrets::delete(&name)?;
@@ -36,7 +36,6 @@ pub fn delete_secret(name: String) -> Result<(), KestrlError> {
 }
 
 /// Every secret the workspace refers to or Kestrl stored, with whether each is set and used.
-/// Reads Keychain attributes only, so it never prompts for access.
 #[uniffi::export]
 pub fn secret_status(workspace_root: String) -> Result<Vec<SecretStatus>, KestrlError> {
     let referenced = secrets::referenced_in_workspace(Path::new(&workspace_root))?;

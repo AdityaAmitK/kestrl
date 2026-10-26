@@ -21,7 +21,7 @@ impl Variables {
         self.expand(input, &mut BTreeSet::new(), 0, false)
     }
 
-    /// Expand variables while preserving secret references, without retrieving Keychain values.
+    /// Expand variables while preserving secret references, without reading secret values.
     pub fn preview_template(&mut self, input: &str) -> Result<String> {
         self.expand(input, &mut BTreeSet::new(), 0, true)
     }

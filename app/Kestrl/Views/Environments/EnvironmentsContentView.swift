@@ -49,7 +49,7 @@ struct EnvironmentsContentView: View {
                 Task { await editor.delete(name) }
             }
         } message: {
-            Text("Its file .kestrl/envs/\(editor.pendingDeletion ?? "").toml is removed. Secrets in the Keychain are not touched.")
+            Text("Its file .kestrl/envs/\(editor.pendingDeletion ?? "").toml is removed. Stored secrets are not touched.")
         }
         .alert(
             "Save changes to \"\(editor.loadedEnvironment ?? "")\"?",
@@ -77,7 +77,7 @@ struct EnvironmentsContentView: View {
             explanation: { intent in
                 switch intent {
                 case .create: return "An environment is a set of variables, such as api_url, that requests resolve when you send them."
-                case .duplicate: return "The copy keeps every variable and comment. Secret values stay in the Keychain and are shared."
+                case .duplicate: return "The copy keeps every variable and comment. Secret values are stored once and shared."
                 case .rename: return "Requests keep working. If this is the default environment, the default follows the new name."
                 }
             }

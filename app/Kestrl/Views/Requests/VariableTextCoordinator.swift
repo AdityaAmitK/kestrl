@@ -60,9 +60,9 @@ final class VariableTextCoordinator: NSObject, NSTextViewDelegate {
             if secret {
                 color = .systemPurple
                 if name.hasPrefix("secret:") {
-                    tooltip = info?.isSet == true ? "Keychain secret — set" : "Keychain secret — not set, run `kestrl secret set \(name.dropFirst(7))`"
+                    tooltip = info?.isSet == true ? "Secret — set" : "Secret — not set, run `kestrl secret set \(name.dropFirst(7))`"
                 } else {
-                    tooltip = "\(info?.source ?? "Variable"): Keychain secret — \(info?.isSet == true ? "set" : "not set"); value hidden"
+                    tooltip = "\(info?.source ?? "Variable"): secret — \(info?.isSet == true ? "set" : "not set"); value hidden"
                 }
                 attributes[.underlineStyle] = NSUnderlineStyle.single.rawValue
             } else if let info {

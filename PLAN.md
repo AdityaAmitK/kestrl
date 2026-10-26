@@ -44,9 +44,9 @@ Each term means one thing and is used the same way in code, the CLI and the docs
 | **Collection** | A folder of request files; its optional `folder.toml` adds variables and a default environment for every request inside | Git |
 | **Environment** | A named set of variables (`local`, `prod`) | Git |
 | **Variable** | `{{api_url}}`, with a value per environment | Git |
-| **Secret** | A variable whose value lives in the Keychain: `{{secret:name}}` | Keychain |
+| **Secret** | A variable whose value lives in Kestrl's secrets file, outside the workspace: `{{secret:name}}` | Secrets file |
 | **Profile** | A reusable add-on of headers and query params, optionally conditional (`admin`) | Git |
-| **Connection** | A database, with host per environment and credentials in the Keychain | Git + Keychain |
+| **Connection** | A database, with host per environment and credentials as secrets | Git + secrets file |
 | **Service** | A named process Kestrl runs or follows (`api`), with its port and PID | Memory |
 | **Live buffer** | Temporary in-memory data: logs and captures | Memory |
 | **History** | Requests and queries you ran, auto-pruned | SQLite |
@@ -69,7 +69,7 @@ app/              SwiftUI macOS app; links kestrl-ffi as an XCFramework
 
 - **GUI:** SwiftUI over the Rust core via UniFFI. The core contains no GUI code.
 - **Store:** SQLite at `~/Library/Application Support/kestrl/history.db` in WAL mode, so the app and CLI can use it at the same time. Project files live in the repo under `.kestrl/`.
-- **Secrets:** macOS Keychain (service `kestrl`). Filled in only at send time and replaced with `••••••` before anything is printed or stored.
+- **Secrets:** `secrets.toml` in the data directory (`~/Library/Application Support/kestrl` on macOS, `~/.local/share/kestrl` on Linux, or `KESTRL_DATA_DIR`), written atomically with owner-only permissions. The CLI and app set, remove and list names but never show a value. Filled in only at send time and replaced with `••••••` before anything is printed or stored.
 - **Output:** human-readable on a TTY; JSON when stdout is not a TTY or with `--json`.
 - **Speed:** sync where possible, tokio only around network I/O, rustls, thin-LTO release builds, no daemon.
 
@@ -87,7 +87,7 @@ app/              SwiftUI macOS app; links kestrl-ffi as an XCFramework
 | Environments | `resolved_env(root, env)` → `[KeyValue]`, secrets masked; `variable_catalog(root, env)` → `[VariableInfo]`, effective environment/workspace values and referenced secret presence, never secret values; `environment_variables`, `save_environment_variables`, `create_environment(root, name, copy_from)`, `rename_environment`, `delete_environment`, `set_default_environment`, `validate_name(kind, name)` |
 | Collections | `create_folder(root, folder)`, `create_request(root, folder, name, method) -> path`, `duplicate_request(root, path) -> path`, `move_item(root, from, to)`, `read_folder_settings` / `save_folder_settings(root, folder, FolderSettingsRecord)`; `WorkspaceInfo.folders` lists folders including empty ones under `requests/`; `variable_catalog(root, env, request_path)` includes folder variables |
 | Profiles | `read_profile`, `save_profile(root, name, ProfileRecord)`, `create_profile(root, name, copy_from)`, `rename_profile`, `delete_profile` |
-| Secrets | `set_secret(name, value)`, `delete_secret(name)`, `secret_status(root)` → referenced ∪ stored names with `is_set` / `is_referenced`; presence is read from Keychain attributes only, so it never prompts |
+| Secrets | `set_secret(name, value)`, `delete_secret(name)`, `secret_status(root)` → referenced ∪ stored names with `is_set` / `is_referenced`; values never cross the FFI outward |
 | Services and logs | `list_services()`, `read_logs(service, since_ms, grep, limit)`, `follow_logs(service, grep, sink) -> LogFollow` with `cancel()` |
 | Database | `db_connections(root)`, `db_query(root, connection, env, sql)`, `db_tables(root, connection, env)`, `db_describe(root, connection, env, table)`; `connection_kinds()`, `read_connection`, `save_connection(root, name, previous, ConnectionRecord)` (create, edit or rename), `delete_connection` |
 | Capture | `start_browser_capture`, `start_port_capture`, `start_device_capture` → `CaptureHandle` with `stop()`. Options select the workspace, source, host filters and history recording; the sink receives redacted, numbered exchanges and `on_end(error)`. Readiness helpers report BPF and device availability. |
@@ -248,7 +248,7 @@ The global `--json` option applies to database commands as well.
 
 ## Phases
 
-1. **Requests and history:** variables, environments, Keychain secrets and masking, profiles, `send`, `run`, history store and retention, `history`, `tag`, `session`.
+1. **Requests and history:** variables, environments, secrets and masking, profiles, `send`, `run`, history store and retention, `history`, `tag`, `session`.
 2. **Services and logs:** `up`, `ps`, `logs` (tail, grep, follow), `attach`. In-memory buffers, with port detection per service.
 3. **Database:** Postgres connections per environment, read-only by default, `db query` and `db tables`. Queries recorded in history.
 4. **Capture:** an HTTPS interception proxy with its own root certificate, device capture (iOS Simulator, Android emulator), browser capture (CDP), and port capture (plain HTTP on loopback). Port capture reads macOS `lo0` through BPF and reconstructs complete TCP/HTTP exchanges. macOS requires privilege to open BPF. The one-time setup is a ChmodBPF-style shell script, `scripts/kestrl-bpf.sh`, run by the user with administrator authorization: it creates a dedicated `kestrl_bpf` group, adds an explicitly named local user, installs a root-owned copy at a fixed path, and loads a LaunchDaemon that gives the group access to `/dev/bpf*` at each boot. Group members can read every interface through BPF, not only `lo0`; Kestrl's capture filter limits what Kestrl reads, not what the group can read. The installer refuses to run while Wireshark's ChmodBPF is installed. `kestrl capture port setup` prints the plan, `status` reports whether BPF is accessible and whether the setup is installed, and `uninstall` prints the removal command, which removes only Kestrl's membership, daemon, script, group and the device permissions it assigned. The setup never runs from the CLI, and no setuid binary or signed helper is used. The interception proxy binds to loopback only. The system proxy must be restored on exit, and again on the next start after a crash; restore retries retain state until every saved service is restored. Android device capture uses exactly one booted emulator (`emulator-*`) and fails when there are zero or several; physical devices are not supported. Before changing the emulator's global `http_proxy`, Kestrl saves the previous value to a private record and restores it on stop, or on the next device capture start. If that emulator is not running, the record is kept and the start fails with an error. Only one device capture runs at a time across the CLI and the app, enforced by a lock file in the run directory; a second start fails rather than waiting. Device capture commands are `kestrl capture sim|android [--port] [--save] [--host]`; browser capture launches a separate Chromium-family browser with an isolated temporary profile.

@@ -12,7 +12,7 @@ final class VariableCompletionCell: NSTableCellView {
         let source = NSTextField(labelWithString: info.source == "environment" ? (environmentName ?? "environment") : info.source)
         source.font = .systemFont(ofSize: 10, weight: .medium)
         source.textColor = .secondaryLabelColor
-        let preview = info.isSecret ? "Keychain secret · \(info.isSet ? "set" : "not set")" : (info.value.isEmpty ? "(empty)" : info.value)
+        let preview = info.isSecret ? "Secret · \(info.isSet ? "set" : "not set")" : (info.value.isEmpty ? "(empty)" : info.value)
         let value = NSTextField(labelWithString: preview)
         value.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
         value.textColor = .secondaryLabelColor

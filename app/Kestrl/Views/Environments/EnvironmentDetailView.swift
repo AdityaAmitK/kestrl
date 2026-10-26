@@ -24,7 +24,7 @@ struct EnvironmentDetailView: View {
             .sheet(isPresented: $isAddingSecret) {
                 AddSecretSheet(
                     store: store,
-                    explanation: "The value goes to the macOS Keychain. The environment file only stores a reference, so it is safe to commit."
+                    explanation: "The value goes to Kestrl's secrets file. The environment file only stores a reference, so it is safe to commit."
                 ) { name in
                     editor.addSecret(named: name)
                     editor.secretToSet = nil
@@ -92,14 +92,14 @@ struct EnvironmentDetailView: View {
             } label: {
                 Label("Add secret…", systemImage: "key")
             }
-            .help("Add a variable whose value lives in the macOS Keychain")
+            .help("Add a variable whose value lives in Kestrl's secrets file")
             Spacer()
             if let message = editor.validationMessage, !editor.rows.isEmpty {
                 Label(message, systemImage: "exclamationmark.triangle")
                     .foregroundStyle(.orange)
                     .lineLimit(1)
             } else {
-                Text("Use {{name}} in requests. Secrets are stored in the Keychain, never in the file.")
+                Text("Use {{name}} in requests. Secrets are stored outside the workspace, never in this file.")
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }

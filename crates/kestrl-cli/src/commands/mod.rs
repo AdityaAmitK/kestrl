@@ -34,7 +34,7 @@ pub enum Command {
     Envs(envs::EnvsArgs),
     /// List profiles, or show one
     Profiles(profiles::ProfilesArgs),
-    /// Manage secrets in the macOS Keychain
+    /// Manage secrets in Kestrl's secrets file
     Secret(secret::SecretArgs),
     /// Capture traffic from a simulator, emulator or browser
     Capture(capture::CaptureArgs),

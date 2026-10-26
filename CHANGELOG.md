@@ -4,6 +4,9 @@ All notable changes are documented here. The format follows [Keep a Changelog](h
 
 ## [Unreleased]
 
+### Changed
+- Secrets are stored in `secrets.toml` in Kestrl's data directory (owner-only, `KESTRL_DATA_DIR` overrides the location) instead of the macOS Keychain, so there are no Keychain access prompts and the store works without Apple frameworks. `{{secret:name}}`, masking, `kestrl secret set|rm|ls` and the app's Secrets section are unchanged, and values are still never shown. Existing Keychain items are not migrated or deleted; set the ones you still use again with `kestrl secret set <name>`.
+
 ## [0.1.2] - 2026-10-25
 
 ### Added

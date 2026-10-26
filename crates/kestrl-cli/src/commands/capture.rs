@@ -115,15 +115,6 @@ pub fn run(ctx: &Context, args: CaptureArgs) -> anyhow::Result<()> {
     } else {
         None
     };
-    let names = root
-        .as_ref()
-        .map(|path| kestrl_core::secrets::referenced_in_workspace(path))
-        .transpose()?
-        .unwrap_or_default();
-    eprintln!(
-        "Reading {} workspace secrets from the Keychain for masking…",
-        names.len()
-    );
     let redactor = Arc::new(match &root {
         Some(root) => kestrl_core::secrets::workspace_redactor(root)?,
         None => kestrl_core::secrets::Redactor::default(),

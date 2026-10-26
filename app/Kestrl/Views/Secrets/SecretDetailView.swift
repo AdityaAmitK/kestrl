@@ -9,7 +9,7 @@ struct SecretDetailView: View {
     var body: some View {
         if let name = store.selectedSecret, let secret = store.secrets.first(where: { $0.name == name }) {
             VStack(spacing: 0) {
-                PaneHeader(secret.name, subtitle: secret.isSet ? "Stored in the Keychain" : "Not set") {
+                PaneHeader(secret.name, subtitle: secret.isSet ? "Stored" : "Not set") {
                     Button(secret.isSet ? "Replace Value…" : "Set Value…") {
                         store.isSettingSecret = true
                     }
@@ -18,13 +18,13 @@ struct SecretDetailView: View {
                         confirmingRemoval = true
                     }
                     .disabled(!secret.isSet)
-                    .help(secret.isSet ? "Delete the value from the Keychain" : "Nothing is stored yet")
+                    .help(secret.isSet ? "Delete the stored value" : "Nothing is stored yet")
                 }
                 Divider()
                 Form {
                     LabeledContent("Status") {
                         Label(
-                            secret.isSet ? "Stored in the macOS Keychain" : "Not set — requests that use it fail until you set it",
+                            secret.isSet ? "Stored in Kestrl's secrets file" : "Not set — requests that use it fail until you set it",
                             systemImage: secret.isSet ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"
                         )
                         .foregroundStyle(secret.isSet ? Color.green : Color.orange)
@@ -47,13 +47,13 @@ struct SecretDetailView: View {
                 .scrollContentBackground(.hidden)
             }
             .confirmationDialog("Remove “\(secret.name)”?", isPresented: $confirmingRemoval, titleVisibility: .visible) {
-                Button("Remove from Keychain", role: .destructive) {
+                Button("Remove Value", role: .destructive) {
                     Task { await store.removeSecret(secret.name) }
                 }
             } message: {
                 Text(secret.isReferenced
                      ? "Requests that use {{secret:\(secret.name)}} fail until it is set again."
-                     : "The value is deleted from the Keychain.")
+                     : "The stored value is deleted.")
             }
             .sheet(isPresented: $store.isSettingSecret) {
                 SetSecretSheet(store: store, name: secret.name)

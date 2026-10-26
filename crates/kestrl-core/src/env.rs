@@ -58,7 +58,7 @@ pub struct VariableInfo {
     pub is_set: bool,
 }
 
-/// Effective environment/workspace variables and referenced Keychain names.
+/// Effective environment/workspace variables and referenced secret names.
 /// Preview expansion masks secrets before reading them; unresolved values remain templates.
 /// With `request`, variables from that request's collection folders are included and win.
 pub fn variable_catalog(
@@ -111,7 +111,7 @@ pub fn variable_catalog(
         catalog.push(VariableInfo {
             is_set,
             name: format!("secret:{name}"),
-            source: "keychain".to_owned(),
+            source: "secrets".to_owned(),
             value: crate::secrets::MASK.to_owned(),
             is_secret: true,
         });

@@ -62,10 +62,10 @@ struct EnvironmentVariableRow: View {
 
     @ViewBuilder private var preview: some View {
         if row.isSecretReference {
-            Label("Keychain secret", systemImage: "key.fill")
+            Label("Secret", systemImage: "key.fill")
                 .font(.caption)
                 .foregroundStyle(.purple)
-                .help("The value is read from the macOS Keychain when a request is sent")
+                .help("The value is filled in from Kestrl's secrets file when a request is sent")
         } else if let resolved, resolved != row.value {
             Text(resolved)
                 .font(.caption.monospaced())

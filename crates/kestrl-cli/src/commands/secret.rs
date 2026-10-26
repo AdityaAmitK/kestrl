@@ -1,4 +1,4 @@
-//! `kestrl secret`: manage secrets in the macOS Keychain.
+//! `kestrl secret`: set, remove and list secrets. Values are never shown.
 
 use std::io::IsTerminal;
 use std::io::Read;
@@ -17,11 +17,11 @@ pub struct SecretArgs {
 
 #[derive(Debug, Subcommand)]
 pub enum SecretAction {
-    /// Set a secret in the macOS Keychain
+    /// Set a secret; the value is read from stdin or a hidden prompt
     Set { name: String },
-    /// Remove a secret from the macOS Keychain
+    /// Remove a stored secret
     Rm { name: String },
-    /// List secrets referenced by the workspace
+    /// List secrets referenced by the workspace or stored, without values
     Ls,
 }
 
