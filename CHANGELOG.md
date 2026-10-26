@@ -4,6 +4,8 @@ All notable changes are documented here. The format follows [Keep a Changelog](h
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-10-26
+
 ### Fixed
 - Secrets used in a URL or query are masked in their percent- and form-encoded forms too, so they no longer reach history encoded.
 - A share's `cloudflared` stops when its owner process dies, even if the owner is killed; it no longer outlives a crashed share.
