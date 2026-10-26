@@ -1,5 +1,6 @@
 //! Memory-only service processes and their live log buffers.
 
+pub mod attach;
 pub mod buffer;
 pub mod client;
 pub mod ports;

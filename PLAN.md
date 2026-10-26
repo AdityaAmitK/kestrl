@@ -21,7 +21,7 @@ Each term means one thing and is used the same way in code, the CLI and the docs
 | **Replay** | Send a past request again exactly as it was | `kestrl history replay <id>` |
 | **Capture** | Kestrl observes traffic that something else makes | `kestrl capture …` |
 | **Up** | Start a service through Kestrl so its logs are collected | `kestrl up` |
-| **Attach** | Follow logs of a service Kestrl did not start (file or Docker) | `kestrl logs attach` |
+| **Attach** | Follow logs of a service Kestrl did not start (file, Docker or systemd journal), on this machine or over SSH | `kestrl logs attach` |
 | **Tail** | Read or follow a service's logs | `kestrl logs <service>` |
 | **Query** | Run SQL against a database connection | `kestrl db query` |
 | **Browse** | Look through database tables | GUI |
@@ -225,7 +225,7 @@ kestrl session start [name] | end
 kestrl up <service> -- <cmd...>
 kestrl ps
 kestrl logs <service> [-f] [--since 2m] [--grep re] [--json]
-kestrl logs attach <service> --file <path> | --docker <container>
+kestrl logs attach <service> --file <path> | --docker <container> | --journal <unit> [--ssh <host>]
 
 # Database
 kestrl db query <connection> "<sql>" [-e env]
@@ -252,6 +252,7 @@ The global `--json` option applies to database commands as well.
 
 1. **Requests and history:** variables, environments, secrets and masking, profiles, `send`, `run`, history store and retention, `history`, `tag`, `session`.
 2. **Services and logs:** `up`, `ps`, `logs` (tail, grep, follow), `attach`. In-memory buffers, with port detection per service.
+   Attach only reads: `tail -F`, `docker logs -f` or `journalctl --follow`; it never starts, stops or restarts the source, so systemd units keep ownership of their processes. With `--ssh <host>` the same follower runs on the remote host through the user's SSH configuration (`BatchMode`, a 10 s connect timeout, keepalives that end a dead connection after about 45 s). A remote wrapper stops the follower when the SSH session closes, so stopping the attach leaves nothing running remotely. The attach is an ordinary service locally: `ps` lists it, `logs` and the app read its live buffer, and Ctrl-C ends it. When no journal entries are visible, the journal follower says that reading the system journal needs `systemd-journal` or `adm` membership; Kestrl never changes permissions. Log lines are not masked.
 3. **Database:** Postgres connections per environment, read-only by default, `db query` and `db tables`. Queries recorded in history.
 4. **Capture:** an HTTPS interception proxy with its own root certificate, device capture (iOS Simulator, Android emulator), browser capture (CDP), and port capture (plain HTTP on loopback). Port capture reads macOS `lo0` through BPF and reconstructs complete TCP/HTTP exchanges. macOS requires privilege to open BPF. The one-time setup is a ChmodBPF-style shell script, `scripts/kestrl-bpf.sh`, run by the user with administrator authorization: it creates a dedicated `kestrl_bpf` group, adds an explicitly named local user, installs a root-owned copy at a fixed path, and loads a LaunchDaemon that gives the group access to `/dev/bpf*` at each boot. Group members can read every interface through BPF, not only `lo0`; Kestrl's capture filter limits what Kestrl reads, not what the group can read. The installer refuses to run while Wireshark's ChmodBPF is installed. `kestrl capture port setup` prints the plan, `status` reports whether BPF is accessible and whether the setup is installed, and `uninstall` prints the removal command, which removes only Kestrl's membership, daemon, script, group and the device permissions it assigned. The setup never runs from the CLI, and no setuid binary or signed helper is used. The interception proxy binds to loopback only. The system proxy must be restored on exit, and again on the next start after a crash; restore retries retain state until every saved service is restored. Android device capture uses exactly one booted emulator (`emulator-*`) and fails when there are zero or several; physical devices are not supported. Before changing the emulator's global `http_proxy`, Kestrl saves the previous value to a private record and restores it on stop, or on the next device capture start. If that emulator is not running, the record is kept and the start fails with an error. Only one device capture runs at a time across the CLI and the app, enforced by a lock file in the run directory; a second start fails rather than waiting. Device capture commands are `kestrl capture sim|android [--port] [--save] [--host]`; browser capture launches a separate Chromium-family browser with an isolated temporary profile.
 5. **GUI:** `kestrl-ffi` and the SwiftUI app: request editor, environment picker, history and timeline, log viewer, DB console, live capture, Copy JSON everywhere.

@@ -90,8 +90,10 @@ kestrl logs [OPTIONS] [SERVICE]
 --json
 
 kestrl logs attach &lt;service&gt; --file &lt;path&gt;
-kestrl logs attach &lt;service&gt; --docker &lt;container&gt;</code></pre><div class="copy-row"><button class="copy-button" type="button" data-copy>Copy</button></div>
-      <p>Use <code>up</code> to start a process through Kestrl. Use <code>logs attach</code> to follow a log file or Docker container for a service Kestrl did not start.</p>
+kestrl logs attach &lt;service&gt; --docker &lt;container&gt;
+kestrl logs attach &lt;service&gt; --journal &lt;unit&gt;
+kestrl logs attach &lt;service&gt; --journal &lt;unit&gt; --ssh &lt;host&gt;</code></pre><div class="copy-row"><button class="copy-button" type="button" data-copy>Copy</button></div>
+      <p>Use <code>up</code> to start a process through Kestrl. Use <code>logs attach</code> to follow a log file, Docker container or systemd journal for a service Kestrl did not start. Add <code>--ssh &lt;host&gt;</code> to follow it on another machine through your SSH configuration; it only reads, never prompts, and stops the remote follower when you stop it.</p>
       <h2>Database</h2><p>Database commands are <code>query</code>, <code>tables</code> and <code>connections</code>. Use <code>-e</code> to select an environment where documented below.</p><pre><code>kestrl db query &lt;connection&gt; "&lt;sql&gt;" [-e &lt;env&gt;]
 kestrl db tables &lt;connection&gt; [-e &lt;env&gt;] [&lt;table&gt;]
 kestrl db connections</code></pre><div class="copy-row"><button class="copy-button" type="button" data-copy>Copy</button></div>

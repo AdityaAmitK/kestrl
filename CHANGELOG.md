@@ -7,6 +7,9 @@ All notable changes are documented here. The format follows [Keep a Changelog](h
 ## [0.1.3] - 2026-10-26
 
 ### Added
+- `kestrl logs attach <service> --journal <unit>` follows a systemd unit's journal, and `--ssh <host>` follows a file, Docker container or journal on another machine over SSH. Attach only reads, never prompts, ends when the connection drops, and leaves nothing running on the remote host when stopped. Remote attaches appear in `kestrl ps`, `kestrl logs` and the app's log viewer like any other service.
+
+### Added
 - Linux CLI: static x86_64 and aarch64 release binaries with checksums, and `install.sh` support for Linux. Requests, environments, secrets, history, services and logs, database queries, browser capture (Chromium-family browsers on `PATH`) and Android emulator capture work on Linux; iOS Simulator capture and port capture report that they are supported only on macOS. `kestrl ps` reads listening ports from `/proc` on Linux, so `lsof` is not required.
 
 ### Changed

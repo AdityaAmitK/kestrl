@@ -60,9 +60,10 @@ Use history to see what the user (actor `me`) already tried before you start, an
 kestrl ps                                     # services started with `kestrl up`, with ports
 kestrl logs api --since 2m --grep 'error|panic'
 kestrl logs api --limit 50
+kestrl logs attach api --journal api.service --ssh my-server   # follow a server's logs over SSH
 ```
 
-Logs are kept in memory only while the service runs. If `ps` shows nothing, the user's server was not started through Kestrl; ask them to restart it with `kestrl up <name> -- <their command>`, or read a log file with `kestrl logs attach <name> --file <path>`.
+Logs are kept in memory only while the service runs. If `ps` shows nothing, the user's server was not started through Kestrl; ask them to restart it with `kestrl up <name> -- <their command>`, or attach without restarting anything: `kestrl logs attach <name> --file <path> | --docker <container> | --journal <unit>`, adding `--ssh <host>` for a remote machine. Attach blocks while it follows, so run it in the background and read with `kestrl logs <name>`; stop it by ending that process. Use only SSH hosts the user has configured; never change server permissions to read a journal.
 
 ## Database
 
