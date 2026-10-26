@@ -57,6 +57,13 @@ mkdir -p ~/.claude/skills/kestrl && cp skills/kestrl/SKILL.md ~/.claude/skills/k
 mkdir -p ~/.codex/skills/kestrl  && cp skills/kestrl/SKILL.md ~/.codex/skills/kestrl/
 ```
 
+Agents can also use Kestrl as MCP tools, on this machine or, with a `host` argument, on another machine over SSH:
+
+```sh
+claude mcp add -s user kestrl -- kestrl mcp
+codex mcp add kestrl -- kestrl mcp
+```
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). Security issues: see [SECURITY.md](SECURITY.md).

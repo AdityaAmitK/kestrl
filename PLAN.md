@@ -24,6 +24,7 @@ Each term means one thing and is used the same way in code, the CLI and the docs
 | **Attach** | Follow logs of a service Kestrl did not start (file, Docker or systemd journal), on this machine or over SSH | `kestrl logs attach` |
 | **Share** | Expose one local web port at a URL through a Cloudflare tunnel, for a limited time | `kestrl share` |
 | **Tail** | Read or follow a service's logs | `kestrl logs <service>` |
+| **Stop** | End a service started with `up` or `logs attach` | `kestrl stop <service>` |
 | **Query** | Run SQL against a database connection | `kestrl db query` |
 | **Browse** | Look through database tables | GUI |
 
@@ -75,6 +76,10 @@ app/              SwiftUI macOS app; links kestrl-ffi as an XCFramework
 - **Secrets:** `secrets.toml` in the data directory (`~/Library/Application Support/kestrl` on macOS, `~/.local/share/kestrl` on Linux, or `KESTRL_DATA_DIR`), written atomically with owner-only permissions. The CLI and app set, remove and list names but never show a value. Filled in only at send time and replaced with `••••••` before anything is printed or stored.
 - **Output:** human-readable on a TTY; JSON when stdout is not a TTY or with `--json`.
 - **Speed:** sync where possible, tokio only around network I/O, rustls, thin-LTO release builds, no daemon.
+
+### Agents (MCP)
+
+`kestrl mcp` is a Model Context Protocol server on stdio (JSON-RPC, protocol 2025-06-18) inside the CLI. Its tools are `send`, `history`, `ps`, `logs`, `logs_attach`, `stop`, `share_open`, `share_list` and `share_close`. Each runs the matching `kestrl` command with `--json` and returns its output, so the adapter has no behavior of its own. An optional `host` runs the command on another machine through `ssh -o BatchMode=yes <host> -- sh -lc 'kestrl …'` (a login shell, so `~/.local/bin` is on PATH); the agent's actor is passed with `--actor`, because remote commands do not see the agent's environment. `logs_attach` starts the follower in the background and confirms it appears in `ps`. Output is cut at 100 KB.
 
 ### FFI surface
 
@@ -231,6 +236,7 @@ kestrl session start [name] | end
 # Services and logs
 kestrl up <service> -- <cmd...>
 kestrl ps
+kestrl stop <service>                     # SIGTERM to its process group; the supervisor cleans up
 kestrl logs <service> [-f] [--since 2m] [--grep re] [--json]
 kestrl logs attach <service> --file <path> | --docker <container> | --journal <unit> [--ssh <host>]
 

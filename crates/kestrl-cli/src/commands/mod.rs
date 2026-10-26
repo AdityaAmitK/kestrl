@@ -6,6 +6,7 @@ pub mod envs;
 pub mod history;
 pub mod init;
 pub mod logs;
+pub mod mcp;
 pub mod output;
 pub mod profiles;
 pub mod proxy;
@@ -15,6 +16,7 @@ pub mod secret;
 pub mod send;
 pub mod session;
 pub mod share;
+pub mod stop;
 pub mod tag;
 pub mod up;
 
@@ -57,6 +59,10 @@ pub enum Command {
     Logs(logs::LogsArgs),
     /// Share a local port through a Cloudflare tunnel for a limited time
     Share(share::ShareArgs),
+    /// Stop a service started with up or logs attach
+    Stop(stop::StopArgs),
+    /// Serve Kestrl tools to agents over the Model Context Protocol (stdio)
+    Mcp(mcp::McpArgs),
 }
 
 /// Flags shared by commands that resolve variables and profiles.
@@ -91,5 +97,7 @@ pub fn dispatch(ctx: &Context, command: Command) -> anyhow::Result<()> {
         Command::Ps(args) => ps::run(ctx, args),
         Command::Logs(args) => logs::run(ctx, args),
         Command::Share(args) => share::run(ctx, args),
+        Command::Stop(args) => stop::run(args),
+        Command::Mcp(args) => mcp::run(ctx, args),
     }
 }
