@@ -34,6 +34,7 @@ impl From<kestrl_core::Error> for KestrlError {
             | Error::Io(_) => Self::File { message },
             Error::InvalidRequest(_)
             | Error::UnknownVariable(_)
+            | Error::EnvironmentVariableNotSet(_)
             | Error::VariableCycle(_)
             | Error::EnvironmentNotFound { .. }
             | Error::EnvironmentExists { .. }

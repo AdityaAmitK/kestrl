@@ -62,6 +62,9 @@ pub enum Error {
     TomlEdit { path: PathBuf, message: String },
     #[error("secret \"{name}\" is not set — run: kestrl secret set {name}")]
     SecretNotSet { name: String },
+    /// `{{env:NAME}}` names an environment variable that is not set.
+    #[error("environment variable {0} is not set (referenced as {{{{env:{0}}}}})")]
+    EnvironmentVariableNotSet(String),
     #[error("variable expansion cycle or depth limit at {0}")]
     VariableCycle(String),
     #[error("HTTP request failed: {0}")]

@@ -24,7 +24,7 @@ pub struct RequestFile {
     pub body: Option<Body>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum Body {
     Json { content: String },
@@ -70,6 +70,7 @@ pub fn resolve(
     config: &WorkspaceConfig,
     env: &str,
     cli_profiles: &[String],
+    cli_headers: &BTreeMap<String, String>,
     vars: Variables,
 ) -> Result<ResolvedRequest> {
     let mut resolved_vars = vars;
@@ -117,6 +118,10 @@ pub fn resolve(
     automatic.sort_by(|a, b| a.0.cmp(&b.0));
     for (_, item) in automatic {
         merge_profile(&mut headers, &mut query, item);
+    }
+    for (name, value) in cli_headers {
+        headers.retain(|existing, _| !existing.eq_ignore_ascii_case(name));
+        headers.insert(name.clone(), value.clone());
     }
     headers = headers
         .into_iter()

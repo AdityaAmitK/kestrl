@@ -295,7 +295,7 @@ fn run_send(
         env,
         profiles,
         vars: KeyValue::into_map(vars),
-        correlation: None,
+        ..SendOptions::default()
     };
     let client = http::client()?;
     let sent = core_send::send(root, target, &options, &client)?;
