@@ -56,6 +56,8 @@ impl ContentArgs {
             if name.is_empty() {
                 bail!("header {header:?} has no name");
             }
+            // The last -H for a name wins, whatever its letter case.
+            headers.retain(|existing: &String, _| !existing.eq_ignore_ascii_case(name));
             headers.insert(name.to_owned(), value.trim().to_owned());
         }
         let body = match (&self.data, &self.json_body) {

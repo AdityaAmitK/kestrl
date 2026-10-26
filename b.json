@@ -1,0 +1,14 @@
+{
+  "access": "protected",
+  "created_at": 1793029933569,
+  "error": null,
+  "expires_at": 1793030233569,
+  "hostname": "share.adityakinjawadekar.com",
+  "id": "7wgvqfjz",
+  "is_https": false,
+  "pid": 93904,
+  "port": 18784,
+  "state": "ready",
+  "tunnel": "kestrl",
+  "url": "https://share.adityakinjawadekar.com"
+}
