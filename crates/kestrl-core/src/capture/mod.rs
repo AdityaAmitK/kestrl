@@ -34,6 +34,17 @@ pub struct CapturedExchange {
     pub tunneled: bool,
 }
 
+/// Fail clearly when a macOS-only capture feature is used on another platform.
+pub(crate) fn require_macos(feature: &str) -> crate::Result<()> {
+    if cfg!(target_os = "macos") {
+        Ok(())
+    } else {
+        Err(crate::Error::Capture(format!(
+            "{feature} is supported only on macOS"
+        )))
+    }
+}
+
 /// Format a captured URL for display, omitting default HTTP and HTTPS ports.
 pub fn display_url(url: &str) -> String {
     let Some((scheme, remainder)) = url.split_once("://") else {

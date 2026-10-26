@@ -24,13 +24,14 @@ pub struct Service {
     pub ports: Vec<u16>,
 }
 
-/// Return the runtime directory, honoring `KESTRL_RUN_DIR`.
+/// Return the runtime directory, honoring `KESTRL_RUN_DIR`; otherwise `run` in the data directory.
 pub fn dir() -> std::io::Result<PathBuf> {
     if let Some(path) = env::var_os("KESTRL_RUN_DIR") {
         return Ok(path.into());
     }
-    let home = env::var_os("HOME").ok_or(std::io::ErrorKind::NotFound)?;
-    Ok(PathBuf::from(home).join("Library/Application Support/kestrl/run"))
+    crate::paths::data_dir()
+        .map(|dir| dir.join("run"))
+        .map_err(|_| std::io::ErrorKind::NotFound.into())
 }
 
 /// Write the service metadata file.

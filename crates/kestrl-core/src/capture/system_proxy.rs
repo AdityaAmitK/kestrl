@@ -102,6 +102,7 @@ fn proxy_address(service: &str, kind: &str) -> Result<(String, String, String)> 
 
 /// Enable HTTP and HTTPS system proxies and persist the old state first.
 pub fn enable(port: u16) -> Result<()> {
+    super::require_macos("iOS Simulator capture")?;
     restore()?;
     let settings = services()?
         .into_iter()

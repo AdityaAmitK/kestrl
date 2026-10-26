@@ -48,11 +48,11 @@ jobs:
 
           ## Install
 
-          Install the CLI with `curl -fsSL https://kestrl.adityakinjawadekar.com/install.sh | sh` or `brew install adityaamitk/tap/kestrl`. Install the app with `brew install --cask adityaamitk/tap/kestrl`, or download the DMG below.
+          Install the CLI on macOS or Linux with `curl -fsSL https://kestrl.adityakinjawadekar.com/install.sh | sh`, or on macOS with `brew install adityaamitk/tap/kestrl`. The Linux CLI is a static binary; iOS Simulator and port capture are macOS only. Install the macOS app with `brew install --cask adityaamitk/tap/kestrl`, or download the DMG below.
 
           ## First launch of the unsigned app
 
-          The app is ad-hoc signed and not notarized. macOS may block its first launch; in Privacy & Security, choose **Open Anyway**. The CLI binary is also ad-hoc signed. Updating the app may prompt again for Keychain access.
+          The app is ad-hoc signed and not notarized. macOS may block its first launch; in Privacy & Security, choose **Open Anyway**. The macOS CLI binary is also ad-hoc signed.
           EOF
       - if: steps.release.outputs.is_release == 'true'
         uses: actions/upload-artifact@v4
@@ -96,6 +96,48 @@ jobs:
           path: dist/kestrl-*-macos-universal.tar.gz*
           retention-days: 7
 
+  cli-linux:
+    needs: validate
+    strategy:
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-latest
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.arch }}-unknown-linux-musl
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: release-cli-linux-${{ matrix.arch }}
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Build static CLI
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+          TARGET: ${{ matrix.arch }}-unknown-linux-musl
+          ASSET: kestrl-${{ needs.validate.outputs.version }}-linux-${{ matrix.arch }}.tar.gz
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq musl-tools
+          cargo build --locked --release -p kestrl-cli --target "$TARGET"
+          mkdir -p dist/cli
+          cp "target/$TARGET/release/kestrl" LICENSE README.md dist/cli/
+          tar -C dist/cli -czf "dist/$ASSET" kestrl LICENSE README.md
+          cd dist
+          sha256sum "$ASSET" > "$ASSET.sha256"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cli-linux-${{ matrix.arch }}
+          path: dist/kestrl-*-linux-*.tar.gz*
+          retention-days: 7
+
   app:
     needs: validate
     runs-on: macos-latest
@@ -134,7 +176,7 @@ jobs:
           retention-days: 7
 
   publish:
-    needs: [validate, cli, app]
+    needs: [validate, cli, cli-linux, app]
     if: needs.validate.outputs.is_release == 'true'
     runs-on: ubuntu-latest
     steps:
@@ -153,6 +195,10 @@ jobs:
           assets=(
             "dist/kestrl-$VERSION-macos-universal.tar.gz"
             "dist/kestrl-$VERSION-macos-universal.tar.gz.sha256"
+            "dist/kestrl-$VERSION-linux-x86_64.tar.gz"
+            "dist/kestrl-$VERSION-linux-x86_64.tar.gz.sha256"
+            "dist/kestrl-$VERSION-linux-aarch64.tar.gz"
+            "dist/kestrl-$VERSION-linux-aarch64.tar.gz.sha256"
             "dist/Kestrl-$VERSION.dmg"
             "dist/Kestrl-$VERSION.dmg.sha256"
           )
