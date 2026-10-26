@@ -12,6 +12,7 @@ pub mod env_files;
 pub mod error;
 pub mod history;
 pub mod http;
+pub mod paths;
 pub mod profile;
 pub mod profile_files;
 pub mod request;

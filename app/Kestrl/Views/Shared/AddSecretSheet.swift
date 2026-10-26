@@ -1,10 +1,10 @@
 import SwiftUI
 
-/// Store a new secret in the Keychain. `onAdded` runs after the value is stored, e.g. to add
+/// Store a new secret. `onAdded` runs after the value is stored, e.g. to add
 /// `name = "{{secret:name}}"` to an environment.
 struct AddSecretSheet: View {
     let store: WorkspaceStore
-    var explanation = "The value goes to the macOS Keychain. Files only store a {{secret:name}} reference, so they are safe to commit."
+    var explanation = "The value goes to Kestrl's secrets file. Workspace files only store a {{secret:name}} reference, so they are safe to commit."
     var onAdded: (String) -> Void = { _ in }
 
     @Environment(\.dismiss) private var dismiss
@@ -33,7 +33,7 @@ struct AddSecretSheet: View {
                 TextField("Name", text: $name, prompt: Text("api_token"))
                     .focused($isNameFocused)
                     .accessibilityLabel("Secret name")
-                SecureField("Value", text: $value, prompt: Text("Stored in the Keychain"))
+                SecureField("Value", text: $value, prompt: Text("Never shown again"))
                     .accessibilityLabel("Secret value")
                     .onSubmit(save)
             }

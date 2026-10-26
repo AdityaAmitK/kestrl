@@ -72,7 +72,7 @@ struct DatabaseContentView: View {
                 Task { await store.deleteConnection(name) }
             }
         } message: {
-            Text("Its file .kestrl/connections/\(pendingDeletion ?? "").toml is removed. The database itself and Keychain secrets are not touched.")
+            Text("Its file .kestrl/connections/\(pendingDeletion ?? "").toml is removed. The database itself and stored secrets are not touched.")
         }
         .onChange(of: store.selectedDatabaseItem) { old, _ in
             Task { await store.databaseSelectionChanged(from: old) }

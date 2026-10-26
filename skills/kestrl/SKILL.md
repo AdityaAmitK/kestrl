@@ -1,11 +1,11 @@
 ---
 name: kestrl
-description: Use the `kestrl` CLI instead of curl, ad-hoc psql, or scrolling terminal output when working on a backend that has a Kestrl workspace (a `.kestrl/` folder) or when the user mentions Kestrl. Covers sending API requests with environments and Keychain secrets, reading request history, reading service logs, querying Postgres read-only, and capturing traffic. Triggers on "send a request", "hit the endpoint", "check the logs", "what did the server return", "query the db", "replay that request", "capture traffic", or any API debugging in a repo containing `.kestrl/`.
+description: Use the `kestrl` CLI instead of curl, ad-hoc psql, or scrolling terminal output when working on a backend that has a Kestrl workspace (a `.kestrl/` folder) or when the user mentions Kestrl. Covers sending API requests with environments and secrets, reading request history, reading service logs, querying Postgres read-only, and capturing traffic. Triggers on "send a request", "hit the endpoint", "check the logs", "what did the server return", "query the db", "replay that request", "capture traffic", or any API debugging in a repo containing `.kestrl/`.
 ---
 
 # Kestrl
 
-Kestrl is a local backend workbench with a CLI and a macOS app over the same data. Use it instead of `curl`, raw `psql`, and copy-pasted terminal logs: every request and query you run is recorded in shared history (attributed to you as the actor), secrets are injected from the macOS Keychain and masked in all output, and the user sees your work in the app.
+Kestrl is a local backend workbench with a CLI and a macOS app over the same data. Use it instead of `curl`, raw `psql`, and copy-pasted terminal logs: every request and query you run is recorded in shared history (attributed to you as the actor), secrets are injected at send time and masked in all output, and the user sees your work in the app.
 
 Check it is available with `kestrl --version`. A workspace is any folder at or above the current directory containing `.kestrl/`.
 
@@ -13,7 +13,7 @@ Check it is available with `kestrl --version`. A workspace is any folder at or a
 
 - Run `kestrl init [DIR]` only when the user asks to set up a workspace. It creates starter configuration and a health request; never initialize a workspace implicitly.
 - **Prefer `kestrl send` over `curl`** for any request to the project's API, so it is recorded and secrets stay masked.
-- **Never handle raw secrets.** Reference them as `{{secret:name}}`. If one is missing, tell the user to run `kestrl secret set <name>` themselves. Never run `secret set` with a value you invented or saw in output, and never try to read the Keychain directly.
+- **Never handle raw secrets.** Reference them as `{{secret:name}}`. If one is missing, tell the user to run `kestrl secret set <name>` themselves. Never run `secret set` with a value you invented or saw in output, and never read Kestrl's secrets file directly.
 - **Output is JSON when piped**, so parse it (`| jq`) instead of scraping text. `redacted` lists which secrets were masked; `••••••` in output is a masked secret, not a bug.
 - **Your actor is detected automatically** (Claude Code, Codex, Cursor). Set `--actor <name>` only if detection is wrong.
 - **Database is read-only by default.** If a write fails with "is read-only in env", report it; do not edit `allow_writes` unless the user asks.

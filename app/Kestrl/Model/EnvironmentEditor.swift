@@ -125,7 +125,7 @@ final class EnvironmentEditor {
         rows.removeAll { ids.contains($0.id) }
     }
 
-    /// Adds `name = "{{secret:name}}"` and asks for the Keychain value.
+    /// Adds `name = "{{secret:name}}"` and asks for the secret value.
     func addSecret(named name: String) {
         let trimmed = name.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return }

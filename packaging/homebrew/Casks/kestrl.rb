@@ -15,7 +15,5 @@ cask "kestrl" do
     the quarantine attribute yourself with:
 
       xattr -dr com.apple.quarantine /Applications/Kestrl.app
-
-    Updating Kestrl may prompt again for Keychain access.
   EOS
 end

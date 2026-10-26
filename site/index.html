@@ -70,11 +70,11 @@ First ask me which setup I want, then do only that:
       </article>
       <article>
         <h3>Built for agents</h3>
-        <p>Agents call <code>kestrl</code> instead of <code>curl</code>. Every request records who ran it: me, Claude Code, Codex or Cursor. Secrets are injected from the Keychain and masked in output, so their values never reach the agent.</p>
+        <p>Agents call <code>kestrl</code> instead of <code>curl</code>. Every request records who ran it: me, Claude Code, Codex or Cursor. Secrets are injected at send time and masked in output, so their values never reach the agent.</p>
       </article>
       <article>
         <h3>Local and private</h3>
-        <p>No accounts, no cloud sync, no telemetry. History is a local SQLite file, secrets live in the macOS Keychain, and request files are plain TOML you can commit.</p>
+        <p>No accounts, no cloud sync, no telemetry. History is a local SQLite file, secrets live in a private file outside your repo, and request files are plain TOML you can commit.</p>
       </article>
       <article>
         <h3>Capture what an app sends</h3>

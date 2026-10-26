@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Enter a secret's value. It goes straight to the Keychain and is never kept in the store.
+/// Enter a secret's value. It goes straight to the secrets file and is never kept in the store.
 struct SetSecretSheet: View {
     let store: WorkspaceStore
     let name: String

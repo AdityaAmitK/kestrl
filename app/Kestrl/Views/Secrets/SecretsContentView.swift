@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Secrets the workspace refers to or the Keychain holds for Kestrl. Values are never shown.
+/// Secrets the workspace refers to or Kestrl stores. Values are never shown.
 struct SecretsContentView: View {
     @Bindable var store: WorkspaceStore
     @State private var isAdding = false
@@ -14,7 +14,7 @@ struct SecretsContentView: View {
                     Image(systemName: "plus")
                 }
                 .buttonStyle(.borderless)
-                .help("Add a secret to the Keychain")
+                .help("Add a secret")
                 .accessibilityLabel("Add secret")
             }
             Divider()
@@ -30,7 +30,7 @@ struct SecretsContentView: View {
                     EmptyPane(
                         "No secrets",
                         systemImage: "key",
-                        description: Text("Add one with +, then use it as {{secret:name}} in a request or environment. Values stay in the macOS Keychain.")
+                        description: Text("Add one with +, then use it as {{secret:name}} in a request or environment. Values are stored outside the workspace and never shown.")
                     )
                 }
             }
@@ -69,7 +69,7 @@ struct SecretsContentView: View {
             }
             Image(systemName: secret.isSet ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
                 .foregroundStyle(secret.isSet ? Color.green : Color.orange)
-                .help(secret.isSet ? "Stored in the Keychain" : "Not set")
+                .help(secret.isSet ? "Stored" : "Not set")
                 .accessibilityLabel(secret.isSet ? "Set" : "Not set")
         }
     }

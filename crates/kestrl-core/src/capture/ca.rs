@@ -5,7 +5,6 @@ use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::PathBuf;
 
-use directories::ProjectDirs;
 use rcgen::{CertificateParams, DistinguishedName, DnType, IsCa, KeyPair, KeyUsagePurpose};
 
 use crate::{Error, Result};
@@ -21,14 +20,7 @@ pub struct CertificateAuthorityFiles {
 
 /// Return the directory containing Kestrl's certificate authority files.
 pub fn files() -> Result<CertificateAuthorityFiles> {
-    let base = match std::env::var_os("KESTRL_DATA_DIR") {
-        Some(path) => PathBuf::from(path),
-        None => ProjectDirs::from("", "", "kestrl")
-            .ok_or(Error::NoDataDir)?
-            .data_dir()
-            .to_path_buf(),
-    };
-    let directory = base.join("ca");
+    let directory = crate::paths::data_dir()?.join("ca");
     Ok(CertificateAuthorityFiles {
         certificate: directory.join("kestrl-ca.pem"),
         private_key: directory.join("kestrl-ca.key"),

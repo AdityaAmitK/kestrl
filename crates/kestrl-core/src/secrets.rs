@@ -1,58 +1,91 @@
-//! Secrets live in the macOS Keychain (service "kestrl"), referenced as
-//! `{{secret:name}}`. Resolved values are tracked so output can be masked.
+//! Secrets are referenced as `{{secret:name}}` and stored outside the workspace in
+//! `secrets.toml` in Kestrl's data directory, readable only by the owner. Kestrl sets, removes
+//! and lists them but never shows a value; resolved values are tracked so output can be masked.
 
-use std::collections::BTreeSet;
-use std::path::Path;
+use std::collections::{BTreeMap, BTreeSet};
+use std::fs::OpenOptions;
+use std::io::Write;
+use std::path::{Path, PathBuf};
 
 use crate::{Error, Result};
 
-const SERVICE: &str = "kestrl";
+const FILE: &str = "secrets.toml";
+const HEADER: &str =
+    "# Kestrl secrets, referenced as {{secret:name}}. Do not commit or share this file.\n";
 pub const MASK: &str = "••••••";
 
+/// Where secrets are stored: `secrets.toml` in the data directory.
+pub fn path() -> Result<PathBuf> {
+    Ok(crate::paths::data_dir()?.join(FILE))
+}
+
 pub fn get(name: &str) -> Result<String> {
-    match keyring::Entry::new(SERVICE, name)?.get_password() {
-        Ok(value) => Ok(value),
-        Err(keyring::Error::NoEntry) => Err(Error::SecretNotSet {
-            name: name.to_owned(),
-        }),
-        Err(error) => Err(Error::Keychain(error)),
-    }
+    load()?.remove(name).ok_or_else(|| Error::SecretNotSet {
+        name: name.to_owned(),
+    })
 }
 
-/// Whether the Keychain holds a value for `name`.
-/// Whether the Keychain holds `name`. Reads attributes only, so it never prompts for access.
-pub fn is_set(name: &str) -> Result<bool> {
-    Ok(stored_names()?.contains(name))
-}
-
-/// Names of every secret Kestrl stored in the Keychain (service "kestrl").
-/// Only item attributes are read, never values, so macOS does not ask for Keychain access.
+/// Names of every stored secret.
 pub fn stored_names() -> Result<BTreeSet<String>> {
-    use security_framework::item::ItemClass;
-    use security_framework::item::ItemSearchOptions;
-    use security_framework::item::Limit;
+    Ok(load()?.into_keys().collect())
+}
 
-    const ITEM_NOT_FOUND: i32 = -25300;
-    let results = match ItemSearchOptions::new()
-        .class(ItemClass::generic_password())
-        .service(SERVICE)
-        .load_attributes(true)
-        .limit(Limit::All)
-        .search()
-    {
-        Ok(results) => results,
-        Err(error) if error.code() == ITEM_NOT_FOUND => return Ok(BTreeSet::new()),
-        Err(error) => {
-            return Err(Error::Keychain(keyring::Error::PlatformFailure(Box::new(
-                error,
-            ))));
-        }
+pub fn set(name: &str, value: &str) -> Result<()> {
+    let mut secrets = load()?;
+    secrets.insert(name.to_owned(), value.to_owned());
+    save(&secrets)
+}
+
+pub fn delete(name: &str) -> Result<()> {
+    let mut secrets = load()?;
+    if secrets.remove(name).is_none() {
+        return Err(Error::SecretNotSet {
+            name: name.to_owned(),
+        });
+    }
+    save(&secrets)
+}
+
+fn load() -> Result<BTreeMap<String, String>> {
+    let path = path()?;
+    let text = match std::fs::read_to_string(&path) {
+        Ok(text) => text,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(BTreeMap::new()),
+        Err(source) => return Err(Error::Read { path, source }),
     };
-    Ok(results
-        .into_iter()
-        .filter_map(|result| result.simplify_dict())
-        .filter_map(|attributes| attributes.get("acct").cloned())
-        .collect())
+    toml::from_str(&text).map_err(|source| Error::Toml { path, source })
+}
+
+/// Replace the secrets file in one rename, with owner-only permissions.
+fn save(secrets: &BTreeMap<String, String>) -> Result<()> {
+    let path = path()?;
+    let text = toml::to_string(secrets).map_err(|error| Error::TomlEdit {
+        path: path.clone(),
+        message: error.to_string(),
+    })?;
+    let temporary = path.with_extension("toml.tmp");
+    let write = || -> std::io::Result<()> {
+        if let Some(dir) = path.parent() {
+            std::fs::create_dir_all(dir)?;
+        }
+        let _ = std::fs::remove_file(&temporary);
+        let mut options = OpenOptions::new();
+        options.create_new(true).write(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.mode(0o600);
+        }
+        let mut file = options.open(&temporary)?;
+        file.write_all(HEADER.as_bytes())?;
+        file.write_all(text.as_bytes())?;
+        file.sync_all()?;
+        std::fs::rename(&temporary, &path)
+    };
+    write().map_err(|source| Error::Write {
+        path: path.clone(),
+        source,
+    })
 }
 
 /// Every secret name the workspace refers to: in `.kestrl/` and in request files.
@@ -110,21 +143,14 @@ pub fn referenced_names(text: &str) -> BTreeSet<String> {
 /// Resolve every secret referenced by TOML files in a workspace for output masking.
 pub fn workspace_redactor(root: &Path) -> Result<Redactor> {
     let names = referenced_in_workspace(root)?;
+    let stored = load()?;
     let mut redactor = Redactor::default();
     for name in names {
-        if let Ok(value) = get(&name) {
-            redactor.track(&name, &value);
+        if let Some(value) = stored.get(&name) {
+            redactor.track(&name, value);
         }
     }
     Ok(redactor)
-}
-
-pub fn set(name: &str, value: &str) -> Result<()> {
-    Ok(keyring::Entry::new(SERVICE, name)?.set_password(value)?)
-}
-
-pub fn delete(name: &str) -> Result<()> {
-    Ok(keyring::Entry::new(SERVICE, name)?.delete_credential()?)
 }
 
 /// Collects resolved secret values and replaces them in any outgoing text.

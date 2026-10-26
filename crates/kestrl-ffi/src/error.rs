@@ -9,7 +9,7 @@ pub enum KestrlError {
     /// A request could not be built or sent
     #[error("{message}")]
     Request { message: String },
-    /// A secret is missing, or the Keychain failed
+    /// A secret is missing
     #[error("{message}")]
     Secret { message: String },
     /// The history database failed, or an event lookup did not match
@@ -43,7 +43,7 @@ impl From<kestrl_core::Error> for KestrlError {
             | Error::Http(_)
             | Error::ServiceNotRunning { .. }
             | Error::ServiceAlreadyRunning { .. } => Self::Request { message },
-            Error::SecretNotSet { .. } | Error::Keychain(_) => Self::Secret { message },
+            Error::SecretNotSet { .. } => Self::Secret { message },
             Error::InvalidMethod(_)
             | Error::InvalidDuration(_)
             | Error::UnknownConnection(_)

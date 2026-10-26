@@ -40,7 +40,7 @@ struct ConnectionSheet: View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(original == nil ? "New connection" : "Edit \"\(original ?? "")\"").font(.headline)
-                Text("Queries are read-only unless an environment allows writes. Put credentials in the Keychain with {{secret:name}}.")
+                Text("Queries are read-only unless an environment allows writes. Keep credentials out of the file with {{secret:name}}.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
