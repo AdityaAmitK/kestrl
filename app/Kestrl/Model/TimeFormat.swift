@@ -23,7 +23,16 @@ enum TimeFormat {
 
     /// How long something has run, such as "45s", "3m 12s", "2h 5m" or "4d 3h"
     static func uptime(sinceMs: Int64, now: Date = .now) -> String {
-        let seconds = max(0, Int(now.timeIntervalSince(date(ms: sinceMs))))
+        span(seconds: Int(now.timeIntervalSince(date(ms: sinceMs))))
+    }
+
+    /// How long until a moment, in the same form as `uptime`
+    static func remaining(untilMs: Int64, now: Date = .now) -> String {
+        span(seconds: Int(date(ms: untilMs).timeIntervalSince(now)))
+    }
+
+    private static func span(seconds: Int) -> String {
+        let seconds = max(0, seconds)
         switch seconds {
         case ..<60: return "\(seconds)s"
         case ..<3_600: return "\(seconds / 60)m \(seconds % 60)s"
