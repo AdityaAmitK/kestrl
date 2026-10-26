@@ -54,7 +54,7 @@ impl From<kestrl_core::Error> for KestrlError {
             | Error::InvalidServiceName { .. }
             | Error::InvalidGrep { .. }
             | Error::InvalidName { .. } => Self::InvalidInput { message },
-            Error::Capture(_) | Error::Database(_) => Self::Request { message },
+            Error::Capture(_) | Error::Share(_) | Error::Database(_) => Self::Request { message },
             Error::Sqlite(_)
             | Error::Json(_)
             | Error::EventNotFound(_)

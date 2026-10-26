@@ -70,6 +70,17 @@ kestrl logs attach api --journal api.service --ssh my-server   # follow a server
 
 Logs are kept in memory only while the service runs. If `ps` shows nothing, the user's server was not started through Kestrl; ask them to restart it with `kestrl up <name> -- <their command>`, or attach without restarting anything: `kestrl logs attach <name> --file <path> | --docker <container> | --journal <unit>`, adding `--ssh <host>` for a remote machine. Attach blocks while it follows, so run it in the background and read with `kestrl logs <name>`; stop it by ending that process. Use only SSH hosts the user has configured; never change server permissions to read a journal.
 
+## Share a port (only when asked)
+
+```sh
+kestrl share open 3000 --public --ttl 30m                      # temporary https://….trycloudflare.com URL
+kestrl share open 3000 --protected --hostname app.example.com  # named hostname behind Cloudflare Access
+kestrl share ls
+kestrl share close <id>        # or --all
+```
+
+Sharing publishes a local web app, so only do it when the user asks, and only for the port they name. Access must be explicit: say which you used. `--protected` refuses unless the hostname has a Cloudflare Access application; do not fall back to `--public` without asking. Shares expire on their own; close them when done. Never share admin, database or log ports; logs stay private over SSH (`kestrl logs attach --ssh`).
+
 ## Database
 
 ```sh

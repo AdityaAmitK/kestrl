@@ -19,6 +19,7 @@ pub mod request;
 pub mod secrets;
 pub mod send;
 pub mod services;
+pub mod share;
 pub mod toml_files;
 pub mod vars;
 pub mod workspace;

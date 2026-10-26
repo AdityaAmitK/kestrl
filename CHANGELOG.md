@@ -7,6 +7,7 @@ All notable changes are documented here. The format follows [Keep a Changelog](h
 ### Added
 - `kestrl send` takes headers and a body on the command line, so it replaces `curl` for authenticated and JSON calls: `-H 'Name: value'` (repeatable, overrides request and profile headers, case-insensitive), `-d/--data` and `--json-body` (`@path` or `@-` for stdin; `--json-body` sets `Content-Type` and `Accept`). Header and body values resolve variables and secrets.
 - `{{env:NAME}}` fills a value from the process environment and masks it in output and history like a secret: `TOKEN="$(cat token-file)" kestrl send GET <url> -H 'Authorization: Bearer {{env:TOKEN}}'`.
+- `kestrl share open <port> --public|--protected` exposes one local web port through a Cloudflare tunnel and prints its URL; `share ls|status|close` manage open shares. Temporary `trycloudflare.com` URLs need no account; `--hostname` uses a named tunnel and creates its DNS route without overwriting other records. `--protected` requires a Cloudflare Access application and verifies it before anything is exposed. Every share expires (`--ttl`, default 1h, at most 24h) and closes cleanly. Needs `cloudflared`.
 
 ## [0.1.3] - 2026-10-26
 
