@@ -181,3 +181,27 @@ fn start(name: &str, cmd: &[String], stdin: Stdio) -> Result<i32> {
     registry::remove(name);
     result
 }
+
+/// Stop a service started with `up` or `logs attach`: terminate its process group, as Ctrl-C in
+/// its terminal would, and wait until the supervisor has removed it. Kills the group if it is still
+/// running after ten seconds.
+pub fn stop(name: &str) -> Result<()> {
+    let service = registry::list()?
+        .into_iter()
+        .find(|service| service.name == name)
+        .ok_or_else(|| Error::ServiceNotRunning {
+            name: name.to_owned(),
+        })?;
+    let group = format!("-{}", service.pid);
+    let _ = Command::new("kill").args(["-TERM", "--", &group]).status();
+    let deadline = std::time::Instant::now() + Duration::from_secs(10);
+    while registry::list()?.iter().any(|service| service.name == name) {
+        if std::time::Instant::now() >= deadline {
+            let _ = Command::new("kill").args(["-KILL", "--", &group]).status();
+            registry::remove(name);
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    Ok(())
+}

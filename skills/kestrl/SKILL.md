@@ -20,6 +20,10 @@ Check it is available with `kestrl --version`. A workspace is any folder at or a
 - **Ask before capture.** `capture sim` changes the macOS system proxy and `capture browser` opens a window; only run them when the user asks. If a capture is interrupted, `kestrl proxy restore` puts the proxy back.
 - Do not start or stop the user's services with `kestrl up` unless asked; read logs from services already running.
 
+## MCP tools and other machines
+
+If the `kestrl` MCP server is configured (`kestrl mcp`), its tools (`send`, `history`, `ps`, `logs`, `logs_attach`, `stop`, `share_open`, `share_list`, `share_close`) are the same commands as below; use whichever is available. Every tool takes an optional `host`: an SSH host from the user's `~/.ssh/config` with Kestrl installed. Without MCP, run `ssh <host> -- sh -lc 'kestrl …'`. Work on the machine that has the service or files; follow a remote server's logs from this machine with `logs attach --ssh <host>`, and stop attaches you started with `kestrl stop <name>` when done.
+
 ## Requests
 
 ```sh
