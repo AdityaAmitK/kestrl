@@ -16,10 +16,11 @@ struct AdHocBar: View {
             .labelsHidden()
             .frame(width: 88)
 
-            VariableTextView(text: $store.adHocURL, variables: store.editorVariables, label: "Request URL", environmentName: store.selectedEnvironment, singleLine: true) {
+            VariableTextView(text: $store.adHocURL, variables: store.editorVariables, label: "Request URL", environmentName: store.selectedEnvironment, singleLine: true, onPaste: { store.pasteCurl($0) }) {
                 Task { await store.sendAdHocRequest() }
             }
             .frame(height: 28)
+            .help("Enter a URL or paste a cURL command")
 
             SendButton(store: store)
         }

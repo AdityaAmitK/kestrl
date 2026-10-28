@@ -8,6 +8,7 @@ struct VariableTextView: NSViewRepresentable {
     var label: String
     var environmentName: String?
     var singleLine = false
+    var onPaste: ((String) -> Bool)?
     var onSubmit: (() -> Void)?
 
     func makeCoordinator() -> VariableTextCoordinator { VariableTextCoordinator(self) }
@@ -32,6 +33,7 @@ struct VariableTextView: NSViewRepresentable {
         view.textContainer?.widthTracksTextView = !singleLine
         if singleLine { view.textContainer?.containerSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: 24) }
         view.completions = context.coordinator.completions
+        view.onPaste = onPaste
         view.delegate = context.coordinator
         view.string = text
         view.setAccessibilityLabel(label)
@@ -48,6 +50,7 @@ struct VariableTextView: NSViewRepresentable {
         let changed = coordinator.parent.variables != variables
         coordinator.parent = self
         guard let view = scroll.documentView as? VariableEditorTextView else { return }
+        view.onPaste = onPaste
         if view.string != text {
             view.string = text
             view.undoManager?.removeAllActions()

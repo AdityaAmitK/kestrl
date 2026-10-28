@@ -91,6 +91,20 @@ final class WorkspaceStore {
         get { requestDraft.url }
         set { requestDraft.url = newValue }
     }
+    /// Import into the current draft atomically, preserving file identity for explicit Save.
+    func pasteCurl(_ text: String) -> Bool {
+        let command = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard command == "curl" || command.hasPrefix("curl ") || command.hasPrefix("curl\t") || command.hasPrefix("curl\n") else { return false }
+        do {
+            var imported = try CurlImport.parse(command)
+            imported.name = requestDraft.name
+            imported.sourceText = requestDraft.sourceText
+            requestDraft = imported
+            errorMessage = nil
+        } catch { report(error) }
+        return true
+    }
+
     var isShowingNewPanel = false
     var isShowingOpenPanel = false
     var isShowingComparison = false

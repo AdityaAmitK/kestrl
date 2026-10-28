@@ -4,6 +4,9 @@ All notable changes are documented here. The format follows [Keep a Changelog](h
 
 ## [Unreleased]
 
+### Added
+- Paste a literal cURL command into the GUI request URL field to fill the method, URL, headers and inline body without sending. Unsupported options leave the draft unchanged.
+
 ## [0.1.5] - 2026-10-26
 
 ### Fixed

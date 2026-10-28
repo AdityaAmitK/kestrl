@@ -5,6 +5,13 @@ final class VariableEditorTextView: NSTextView {
     private let hover = VariableHoverController()
     private var hoverAreas: [NSTrackingArea] = []
     private var previews: [(range: NSRange, name: String, text: String, isSecret: Bool)] = []
+    var onPaste: ((String) -> Bool)?
+
+    override func paste(_ sender: Any?) {
+        if let text = NSPasteboard.general.string(forType: .string), onPaste?(text) == true { return }
+        super.paste(sender)
+    }
+
     var completions: VariableCompletionController?
 
     func updatePreviews(_ tokens: [(NSRange, String, String, Bool)]) {
