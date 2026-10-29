@@ -9,3 +9,6 @@
 /app/Kestrl.xcodeproj/
 /app/Kestrl/Info.plist
 /packaging/homebrew/rendered
+
+# Machine-local signing identity and team
+/app/Signing.local.xcconfig

@@ -287,3 +287,7 @@ The global `--json` option applies to database commands as well.
 ## Website
 
 The static site keeps an icon-led installation hero with an inspectable “Copy to my agent” setup prompt, short feature descriptions, and demo GUI and CLI views. Deployment serves the canonical `skills/kestrl/SKILL.md` at `/skill/SKILL.md`.
+
+## Local app builds
+
+`scripts/build-app.sh [--release]` optionally reads the gitignored `app/Signing.local.xcconfig` for an exact local signing certificate SHA1 and development team. Without it, project defaults remain ad-hoc signed; bundle IDs and entitlements are unchanged.
