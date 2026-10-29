@@ -36,8 +36,13 @@ ARCH_SETTINGS=()
 if [[ "$CONFIGURATION" == "Release" ]]; then
     ARCH_SETTINGS=(ARCHS="arm64 x86_64" ONLY_ACTIVE_ARCH=NO)
 fi
+# Optional machine-local signing settings; public builds keep the project defaults.
+SIGNING_SETTINGS=()
+if [[ -f "$ROOT/app/Signing.local.xcconfig" ]]; then
+    SIGNING_SETTINGS=(-xcconfig "$ROOT/app/Signing.local.xcconfig")
+fi
 xcodebuild -project "$ROOT/app/Kestrl.xcodeproj" -scheme Kestrl -configuration "$CONFIGURATION" \
-    -derivedDataPath "$DERIVED" -quiet ${ARCH_SETTINGS[@]+"${ARCH_SETTINGS[@]}"} build
+    -derivedDataPath "$DERIVED" -quiet ${SIGNING_SETTINGS[@]+"${SIGNING_SETTINGS[@]}"} ${ARCH_SETTINGS[@]+"${ARCH_SETTINGS[@]}"} build
 
 APP="$DERIVED/Build/Products/$CONFIGURATION/Kestrl.app"
 step "Built"

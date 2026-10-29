@@ -32,6 +32,16 @@ The app and CLI are ad-hoc signed, not notarized. On first launch, macOS may blo
 
 Requires Rust (stable) on macOS or Linux. The macOS app also needs Xcode and XcodeGen (`scripts/build-app.sh`).
 
+For persistent local signing, create the gitignored `app/Signing.local.xcconfig`:
+
+```xcconfig
+CODE_SIGN_IDENTITY = <exact installed signing certificate SHA1>
+DEVELOPMENT_TEAM = <certificate team ID>
+CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO
+```
+
+Use `security find-identity -v -p codesigning` and verify the certificate's team before choosing its exact SHA1; do not choose the first identity. Run `bash scripts/build-app.sh --release` to rebuild into `target/app/Build/Products/Release/Kestrl.app`. The script passes the optional file to Xcode without changing bundle IDs or entitlements. Keep certificate fingerprints out of tracked files. Without this file, builds retain ad-hoc signing, including CI. Local development signing does not notarize the app.
+
 ```sh
 git clone https://github.com/AdityaAmitK/kestrl
 cd kestrl
